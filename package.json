@@ -2,6 +2,10 @@
   "name": "breachlab",
   "version": "0.3.0",
   "private": true,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fedesauzzadev/breachlab.git"
+  },
   "description": "BreachLab — sandbox 100% local de un incidente de API key filtrada. Demo educativa: vulnerable por diseño, aislada en 127.0.0.1, keys 100% falsas.",
   "engines": {
     "node": ">=24"

@@ -37,7 +37,7 @@
 <body>
 <header>
   <h1>🏭 BreachLab</h1>
-  <span class="sub">NSDD Software Factory · actualizado 2026-11-15 · V1 completa · QA V1 SHIP ✓ · G3 pendiente</span>
+  <span class="sub">NSDD Software Factory · actualizado 2026-11-15 · V0+V1+V2 entregadas · publicado en GitHub · CI final corriendo</span>
 </header>
 <nav>
   <button class="on" data-t="mvp">MVP</button>
@@ -52,9 +52,9 @@
   <h2>Entregable MVP</h2>
   <div class="card"><ul>
     <li>Lab interactivo 100% local del incidente real: API key filtrada → ataque → detección → matafuegos → hardening (5 actos).</li>
-    <li><b>V1 entregada y verificada (v0.2.0)</b> — además del MVP: modo guiado (5 pasos con hitos automáticos), reinicio del incidente sin restart, escenario 2 "key válida sin scope" (mínimo privilegio). QA V1: SHIP, race del reset cerrada con evidencia antes/después.</li>
-    <li>Declarada como deuda: L-8 (cursores timeline tras reset externo) · L-9 (flood de GETs válidos dispara alerta) · L-4/L-5/L-6 (menores V0).</li>
-    <li>Probar: <span class="kbd">npm ci</span> + <span class="kbd">npm start</span> → <span class="kbd">http://127.0.0.1:3000</span> — activá "Modo guiado" y "Escenario 2" desde el panel.</li>
+    <li><b>Producto completo entregado y publicado (v0.3.0)</b>: V0 incidente en 5 actos · V1 modo guiado + reinicio + escenario scope · V2 serie de 3 vectores de filtración + export de evidencia. Fix de feedback G3: atacante se rinde tras 20 rebotes, escenarios finitos.</li>
+    <li>Repo público: <b>github.com/fedesauzzadev/breachlab</b> — CI (tests+cobertura+gitleaks) en cada push · suite local 52/52.</li>
+    <li>Probar local: <span class="kbd">npm ci</span> + <span class="kbd">npm start</span> → <span class="kbd">http://127.0.0.1:3000</span> — modo guiado recomendado.</li>
     <li>Sandbox aislado: bind solo 127.0.0.1, keys 100% falsas, cero llamadas a terceros (verificado S01 con netstat+grep).</li>
   </ul></div>
 </section>
@@ -79,8 +79,8 @@
     </ul></div>
     <div class="card"><h3>N-0005 · H-05 Modo guiado + reinicio (V1)</h3><span class="chip st-verified">verified (S08)</span><ul><li class="li-ok">☑ Pasos numerados con siguiente resaltado</li><li class="li-ok">☑ Reiniciar incidente sin reiniciar proceso</li></ul></div>
     <div class="card"><h3>N-0006 · H-06 Escenario key sin scope (V1)</h3><span class="chip st-verified">verified (S08)</span><ul><li class="li-ok">☑ Key válida sin escritura → 403 + audit</li><li class="li-ok">☑ Panel conecta con mínimo privilegio</li></ul></div>
-    <div class="card"><h3>N-0007 · H-07 Serie de labs (V2)</h3><span class="chip st-planned">planned</span><ul><li>☐ Escenarios elegibles, ciclo completo c/u</li></ul></div>
-    <div class="card"><h3>N-0008 · H-08 Export de evidencia (V2)</h3><span class="chip st-planned">planned</span><ul><li>☐ Archivo legible con cronología sin correr nada</li></ul></div>
+    <div class="card"><h3>N-0007 · H-07 Serie de labs (V2)</h3><span class="chip st-verified">verified (S09a)</span><ul><li class="li-ok">☑ 3 vectores elegibles con ciclo y narración propios</li></ul></div>
+    <div class="card"><h3>N-0008 · H-08 Export de evidencia (V2)</h3><span class="chip st-verified">verified (S09b)</span><ul><li class="li-ok">☑ Markdown attachment: timeline + audit + postmortem</li></ul></div>
   </div>
 </section>
 
@@ -89,14 +89,14 @@
   <div class="timeline">
     <div class="tl-item done"><h3>V0 — MVP: el incidente completo (S01..S06)</h3><p>S01..S06 <b style="color:var(--ok)">✓ todos entregados y verificados</b> (S01 sandbox · S02 panel+docs+secrets · S03 ataque+detección · S04 matafuegos · S05 hardening · S06 postmortem+DoD). Valor: la demo completa de <5 min — <b style="color:var(--ok)">SHIP, esperando G2</b>.</p></div>
     <div class="tl-item done"><h3>V1 — Narración sin fricción (S08) <b style="color:var(--ok)">✓ ENTREGADA v0.2.0</b></h3><p>Modo guiado paso a paso + reinicio del incidente + escenario key-sin-scope. QA V1: SHIP (rework M-3/M-4/L-7 aplicado). Deuda declarada: L-8/L-9.</p></div>
-    <div class="tl-item"><h3>V2 — Serie de labs + export (S08)</h3><p>Nuevos vectores de filtración como escenarios elegibles + export de evidencia. — <i>futuro</i>. Necesita: V1.</p></div>
+    <div class="tl-item done"><h3>V2 — Serie de labs + export (S09) <b style="color:var(--ok)">✓ ENTREGADA v0.3.0</b></h3><p>3 vectores de filtración elegibles (config versionada · log de server · bundle JS) + export de evidencia en markdown. Repo publicado: <b>github.com/fedesauzzadev/breachlab</b> (CI: tests+cobertura+gitleaks en cada push).</p></div>
   </div>
 </section>
 
 <section id="quality">
   <h2>Verificación y QA</h2>
   <div class="kpi">
-    <div class="card"><b>43/43</b>tests verdes (V0+V1)</div>
+    <div class="card"><b>52/52</b>tests verdes (V0+V1+V2)</div>
     <div class="card"><b>97.8%</b>cobertura líneas (umbral 70%)</div>
     <div class="card"><b>16/23 ms</b>p95 GET state / POST entries (umbral 200)</div>
     <div class="card"><b>0/0/2*</b>hallazgos QA crit/high/medium (*resueltos)</div>
