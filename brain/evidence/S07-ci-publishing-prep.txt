@@ -1,0 +1,79 @@
+# S07 — CI GitHub Actions + publicación prep · Evidencia de verificación
+
+Fecha: 2026-11-15 · HEAD base: e0594ea · Máquina: fábrica (Windows, Node v24.19.0)
+
+## Entregables verificados
+
+Archivos: `.github/workflows/ci.yml` (nuevo) · `README.md` (pulido) · `README.es.md` (espejo) ·
+`docs/PUBLISHING.md` (nuevo). `package.json` SIN edición: `engines.node ">=24"` ya presente;
+campo `repository` deliberadamente ausente (URL no existe aún — instrucción de completarlo en
+docs/PUBLISHING.md; no se inventó).
+
+## 1. YAML del workflow — verificado POR MÁQUINA (PyYAML)
+
+Comando: `python -c "import yaml; d=yaml.safe_load(open('.github/workflows/ci.yml', encoding='utf-8')); ..."`
+(js-yaml no instalado; Python + PyYAML disponible en la máquina)
+
+Observado:
+- parse OK, sin errores de sintaxis
+- `jobs: ['test', 'gitleaks']`
+- triggers: `['push', 'pull_request']` (push restringido a `branches: [main]`)
+- job gitleaks, step action: `env: ['GITHUB_TOKEN', 'GITLEAKS_CONFIG']`
+
+**Desviación documentada vs. orden original (gitleaks-action@v2 + input config-path):**
+fuente oficial del action (raw README gitleaks/gitleaks-action, consultado 2026-11-15):
+1. No existe input `config-path`; la config custom se pasa por **env var `GITLEAKS_CONFIG`**
+   (valor usado: `.gitleaks.toml`, el archivo versionado del repo).
+2. **@v2 está roto desde 2026-09-16** (GitHub removió Node 20 de los runners; v2 requería
+   Node 20). Se usa **@v3** (inputs/behavior idénticos, runtime Node 24) + `actions/checkout@v6`
+   (recomendación oficial para v3; con `fetch-depth: 0` en el job de scan, como sugiere el README).
+3. `GITLEAKS_LICENSE` NO se setea: requerido solo para cuentas de organización; la cuenta es
+   personal (fedesauzzadev). Nota de escape documentada en docs/PUBLISHING.md.
+
+Job test: ubuntu-latest, setup-node@v5 con `node-version: 24` + `cache: npm` (package-lock.json
+presente), pasos `npm ci` → `npm test` → `npm run test:coverage`. Sin matrix (solo 24, engines
+lo exige), sin secrets propios.
+
+## 2. gh auth status
+
+```
+✓ Logged in to github.com account fedesauzzadev (keyring)
+  Token scopes: 'gist', 'read:org', 'repo', 'workflow'
+```
+(scope `workflow` presente → el push futuro puede crear el workflow. Identidad git local ya
+configurada: user.name=fedesauzzadev, email=noreply de GitHub — D-0005 §3.)
+
+## 3. npm ci && npm test (nada roto)
+
+```
+npm ci → added 65 packages, 0 vulnerabilities
+npm test → tests 37 · pass 37 · fail 0 (duration 19.2 s)
+```
+Esperado 37/37 (suite QA SHIP) → observado 37/37. Incluye e2e 5 actos, NFR-5, DB corrupta.
+
+## 4. Secrets scan local (READMEs nuevos contienen el prefijo de key falsa en texto)
+
+`gitleaks.exe` (8.30.1, binario winget en
+`%LOCALAPPDATA%\Microsoft\WinGet\Packages\Gitleaks.Gitleaks...`) — NO en PATH (deuda L-5):
+```
+scanned ~284232 bytes in 171ms — no leaks found — exit 0
+```
+
+## 5. README render check (estructura + links internos)
+
+- Links resueltos a archivos existentes: `docs/postmortem.md` ✓, `LICENSE` ✓,
+  `README.es.md` ↔ `README.md` ✓ (Test-Path).
+- Badges SOLO como comentario HTML `<!-- BADGES ... -->` en ambos READMEs ✓ (cero badge roto
+  pre-push; instrucción de descomentar en docs/PUBLISHING.md).
+- Espejo ES: secciones 1:1 (intro/por qué, quickstart, 5 actos, postmortem, seguridad, stack,
+  desarrollo, troubleshooting, licencia) ✓ (verificado con `-Encoding UTF8`; un falso negativo
+  inicial fue artefacto de encoding ANSI de PowerShell 5.1, no del archivo).
+
+## 6. EXPLÍCITAMENTE NO VERIFICABLE local (gate humano, D-0005)
+
+- **Run real de GitHub Actions**: solo ocurre post-push (el repo no existe; el push es gate
+  humano del Negocio). El workflow fue validado por sintaxis (§1) y por equivalencia de
+  comandos con la corrida local (§3: mismos `npm ci/test/test:coverage`), pero el run verde
+  en Actions queda PENDIENTE hasta el primer push. docs/PUBLISHING.md lo declara como gate.
+- **Render real de badges**: dependen del repo existente (por eso van comentados).
+- `setup-node@v5` / `checkout@v6` resuelviendo en runners de GitHub: no simulable localmente.
