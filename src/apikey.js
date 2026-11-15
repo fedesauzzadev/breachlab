@@ -44,7 +44,7 @@ function createApiKeyAuth(lab) {
     return res.status(status).json({ error });
   };
 
-  return function apiKeyAuth(req, res, next) {
+  const apiKeyAuth = function apiKeyAuth(req, res, next) {
     const key = req.get('x-api-key');
     const hardened = lab.state.flags && lab.state.flags.hardening;
     const row = key
@@ -62,6 +62,10 @@ function createApiKeyAuth(lab) {
     recordHit(key);
     next();
   };
+  // S08 reset (N-0005): el detector vuelve a cero — sin hits ni cooldown heredados del
+  // incidente anterior (si no, la 2da demo detectaría tarde por el cooldown de 15 s).
+  apiKeyAuth.reset = () => { hits.clear(); lastAlertAt = 0; };
+  return apiKeyAuth;
 }
 
 module.exports = { createApiKeyAuth, DETECTION_MAX_REQUESTS, DETECTION_WINDOW_MS, ALERT_COOLDOWN_MS };

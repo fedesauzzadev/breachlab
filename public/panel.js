@@ -9,6 +9,8 @@
     4: ['down', 'Incidente contenido'], 5: ['ok', 'Sistema endurecido'],
   };
   let lastEventId = 0;
+  let lastState = null;   // S08: último /api/lab/state (render del modo guiado)
+  let guidedOn = false;   // S08: el modo guiado es estado del panel, no del lab
 
   // L-3: nodos DOM + textContent, nunca innerHTML con datos de requests (defense-in-depth).
   const el = (tag, cls, text) => {
@@ -22,6 +24,7 @@
   async function pollState() {
     try {
       const s = await (await fetch('/api/lab/state')).json();
+      lastState = s;
       $('conn').hidden = true;
       const [cls, label] = BADGES[s.act] || ['down', 'estado ?'];
       const badge = $('state');
@@ -48,6 +51,9 @@
       feed.hidden = s.attack.recent.length === 0;
       feed.replaceChildren(...s.attack.recent.map((r) =>
         el('code', r.status >= 200 && r.status < 300 ? 'c2xx' : 'c4xx', r.status)));
+      // S08: escenario 2 habilitado solo con hardening activo y ataque detenido.
+      $('scenario-btn').disabled = !s.flags.hardening || s.attack.running;
+      if (guidedOn) renderGuided(s);
     } catch {
       $('conn').hidden = false; // reintenta en el próximo tick
     }
@@ -129,6 +135,52 @@
     pre.textContent = JSON.stringify(cfg, null, 2);
     pre.hidden = false;
   });
+
+  // S08 modo guiado (N-0005): los hitos llegan por /api/lab/state (milestones) — acá solo
+  // el guion numerado: próximo resaltado, hechos confirmados con ✓, resto atenuado.
+  const STEPS = [
+    ['attack_started', 'Ver el leak (origen) y simular el ataque'],
+    ['alert_fired', 'Esperar la detección: >30 requests / 10 s → alerta crítica'],
+    ['firewalls_applied', 'Aplicar los matafuegos: kill switch, rotación y rate limit'],
+    ['hardening_on', 'Activar el hardening: sha256 + scopes + audit log'],
+    ['reattack_bounced', 'Re-atacar con la key filtrada y ver el rebote 401/403'],
+  ];
+  function renderGuided(s) {
+    const m = s.milestones || {};
+    const next = STEPS.findIndex(([id]) => !m[id]);
+    $('guided').replaceChildren(...STEPS.map(([id, label], i) => {
+      const li = el('li', i < next ? 'done' : (i === next ? 'next' : ''));
+      li.textContent = `${i + 1}. ${label}`;
+      return li;
+    }));
+  }
+  $('guided-btn').addEventListener('click', () => {
+    guidedOn = !guidedOn;
+    $('guided').hidden = !guidedOn;
+    $('guided-btn').textContent = guidedOn ? 'Ocultar modo guiado' : 'Activar modo guiado';
+    if (guidedOn && lastState) renderGuided(lastState);
+  });
+
+  // S08 reinicio (N-0005): el server restaura el seed sin reiniciar el proceso; acá se
+  // rearman los cursores porque los ids del timeline/audit vuelven a arrancar en 1.
+  $('reset-btn').addEventListener('click', async () => {
+    try {
+      await fetch('/api/lab/reset', {
+        method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}',
+      });
+    } catch { /* el polling reintenta */ }
+    lastEventId = 0;
+    lastAuditId = 0;
+    $('timeline').replaceChildren();
+    $('audit').replaceChildren();
+    $('alert').hidden = true;
+    $('feed').hidden = true;
+  });
+
+  // S08 escenario 2 (N-0006): lanza el bot con una key válida sin scope de escritura.
+  $('scenario-btn').addEventListener('click', () => fetch('/api/lab/scenario/scopeless-key', {
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}',
+  }).catch(() => {}));
 
   pollState();
   pollTimeline();

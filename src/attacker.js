@@ -19,15 +19,19 @@ function createAttacker({ lab, port } = {}) {
     baseUrl: `http://${HOST}:${port || defaultPort}/api`,
     // Solo tests efímeros (puerto 0) reasignan el puerto; el host no cambia jamás.
     setPort(p) { att.baseUrl = `http://${HOST}:${p}/api`; },
-    start() {
+    start(key) {
       if (att.timer) return;
       const a = lab.state.attack || (lab.state.attack = { running: false, requests: 0, blocked: 0, recent: [] });
       a.running = true;
       if (lab.state.act === 1) lab.state.act = 2; // acto 2: ataque corriendo sin alerta
-      // Se relee el artefacto en CADA arranque: el re-ataque usa SIEMPRE la key filtrada original.
-      att.key = JSON.parse(readFileSync(leakFile, 'utf8')).api_key;
+      // Se relee el artefacto en CADA arranque: el re-ataque usa SIEMPRE la key filtrada
+      // original. Excepción S08 (N-0006): key explícita = la sin scope del escenario 2.
+      att.key = key || JSON.parse(readFileSync(leakFile, 'utf8')).api_key;
       att.timer = setInterval(() => att.fire(), BOT_INTERVAL_MS);
     },
+    // S08 reset (N-0005): bot frenado y numeración de payloads a cero — la demo re-narrada
+    // es idéntica a la primera (SPAM-1, no SPAM-45).
+    reset() { att.stop(); att.n = 0; },
     stop() {
       if (!att.timer) return;
       clearInterval(att.timer);

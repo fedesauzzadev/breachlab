@@ -4,7 +4,8 @@
 const express = require('express');
 const { readFileSync } = require('node:fs');
 const path = require('node:path');
-const { maskKey } = require('./lab');
+const { randomBytes } = require('node:crypto');
+const { maskKey, sha256Hex } = require('./lab');
 const { DETECTION_MAX_REQUESTS, DETECTION_WINDOW_MS, ALERT_COOLDOWN_MS } = require('./apikey');
 const { BOT_INTERVAL_MS } = require('./attacker');
 
@@ -12,7 +13,7 @@ const { BOT_INTERVAL_MS } = require('./attacker');
 const leakedKey = JSON.parse(
   readFileSync(path.join(__dirname, '..', 'repo-sim', 'config.json'), 'utf8')).api_key;
 
-function createLabRoutes(lab, attacker, rateLimiter) {
+function createLabRoutes(lab, attacker, rateLimiter, auth = null) {
   const router = express.Router();
   router.use(express.json());
   const byKind = lab.db.prepare('SELECT kind, COUNT(*) AS n FROM entries GROUP BY kind');
@@ -23,11 +24,21 @@ function createLabRoutes(lab, attacker, rateLimiter) {
     const counts = { legit: 0, garbage: 0 };
     for (const row of byKind.all()) counts[row.kind] = row.n;
     const current = activeKey.get();
+    const a = lab.state.attack;
+    const f = lab.state.flags;
     res.json({
       act: lab.state.act,
-      attack: lab.state.attack,
+      attack: a,
       db: counts,
-      flags: lab.state.flags,
+      flags: f,
+      // S08 modo guiado (N-0005): hitos derivados SOLO de estado runtime — nada nuevo en DB.
+      milestones: {
+        attack_started: lab.state.act >= 2,
+        alert_fired: lab.state.act >= 3,
+        firewalls_applied: !!(f.killswitch && f.rotated && f.ratelimit),
+        hardening_on: !!f.hardening,
+        reattack_bounced: !!(f.hardening && a.blocked > (a.reattackBase ?? Infinity)),
+      },
       keys: {
         leaked_masked: maskKey(leakedKey),
         // Con hardening el plain no existe: la máscara se guardó al migrar/rotar (lab.js).
@@ -113,9 +124,49 @@ function createLabRoutes(lab, attacker, rateLimiter) {
     const keys_hashed = lab.hardenKeys();
     lab.state.flags.hardening = true;
     lab.state.act = 5;
+    // S08: base del hito "re-ataque rebote" — cuentan los bloqueos NUEVOS desde acá.
+    if (lab.state.attack) lab.state.attack.reattackBase = lab.state.attack.blocked;
     insAction.run(new Date().toISOString(),
       `Hardening ON · ${keys_hashed} key(s) migradas a sha256 (key_plain → NULL) · scope write:entries solo para la vigente · cada rebote queda en el audit log`);
     res.json({ hardening: true, keys_hashed });
+  });
+
+  // S08 (N-0005): reinicio del incidente SIN reiniciar el proceso — vuelve al acto 1
+  // exacto: seed restaurado, timeline/audit limpios, flags y contadores en cero.
+  router.post('/reset', async (req, res) => {
+    const b = req.body;
+    if (b !== undefined && (typeof b !== 'object' || Array.isArray(b) || Object.keys(b).length > 0)) {
+      return bad(res, 'body vacío {} — sin campos extra');
+    }
+    attacker.reset();
+    // Deja terminar los POST en vuelo del bot antes de limpiar: si no, un insert ya
+    // autenticado podría aterrizar en la DB recién re-seedeada.
+    await new Promise((r) => setTimeout(r, BOT_INTERVAL_MS + 100));
+    rateLimiter.cfg.enabled = false;
+    rateLimiter.configure(); // ventanas limpias
+    if (typeof auth.reset === 'function') auth.reset(); // detector: hits y cooldown a cero
+    lab.reset();
+    res.json({ reset: true });
+  });
+
+  // S08 (N-0006) escenario 2: key auténtica y activa pero SIN scope de escritura — el
+  // bot la usa: sus POST rebotan 403 insufficient_scope auditados, la DB queda limpia.
+  router.post('/scenario/scopeless-key', (req, res) => {
+    const b = req.body;
+    if (b !== undefined && (typeof b !== 'object' || Array.isArray(b) || Object.keys(b).length > 0)) {
+      return bad(res, 'body vacío {} — sin campos extra');
+    }
+    if (!lab.state.flags.hardening) return bad(res, 'requiere hardening activo (activelo primero)');
+    if (lab.state.attack.running) return bad(res, 'detenga el ataque antes de lanzar el escenario');
+    const fresh = `sk_breachlab_demo_SCOPELESS_${randomBytes(8).toString('hex')}`; // FAKE BY DESIGN
+    lab.db.prepare(
+      "INSERT INTO api_keys(label, key_hash, scope, status, created_at) VALUES ('scenario-scopeless', ?, NULL, 'active', ?)"
+    ).run(sha256Hex(fresh), new Date().toISOString());
+    const mask = maskKey(fresh);
+    insAction.run(new Date().toISOString(),
+      `Escenario 2 · key ${mask} válida y activa pero SIN scope write:entries · sus POST → 403`);
+    attacker.start(fresh);
+    res.status(202).json({ scenario: 'scopeless-key', running: true, key_masked: mask });
   });
 
   // Audit log (§2.4): intentos bloqueados con hardening activo; ?since=<id> incremental.

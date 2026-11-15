@@ -35,6 +35,11 @@
   .feed .c4xx, #audit .c4xx { color:var(--red); background:rgba(248,81,73,.12); }
   code { font-family:ui-monospace,monospace; }
   a { color:#58a6ff; }
+  #guided { list-style:none; margin-top:12px; }
+  #guided li { padding:6px 10px; border-left:3px solid var(--line); opacity:.45; margin:4px 0; }
+  #guided li.next { opacity:1; border-left-color:var(--amber); background:rgba(210,153,34,.08); font-weight:600; }
+  #guided li.done { opacity:.6; }
+  #guided li.done::after { content:" ✓"; color:var(--green); }
 </style>
 </head>
 <body>
@@ -48,6 +53,18 @@
     <div><b id="act">—</b><span>acto (1–5)</span></div>
     <div><b id="entries">—</b><span>registros en la DB</span></div>
   </div>
+</section>
+
+<section>
+  <h2>Modo guiado</h2>
+  <p class="warn">El guion de la demo en 5 pasos (los 5 actos): el siguiente resaltado, los
+     completados confirmados con ✓, el resto atenuado. Se marcan solos cuando el lab detecta
+     cada hito.</p>
+  <button id="guided-btn">Activar modo guiado</button>
+  <button id="reset-btn">Reiniciar incidente</button>
+  <ol id="guided" hidden></ol>
+  <p class="warn">«Reiniciar incidente» restaura el seed y limpia el timeline sin reiniciar el
+     proceso — la demo se puede volver a narrar en la misma sesión.</p>
 </section>
 
 <section>
@@ -78,6 +95,18 @@
      plano), la escritura exige scope <code>write:entries</code> y cada rebote queda auditado.</p>
   <button id="fw-harden">Activar hardening</button>
   <p class="warn">Almacenamiento de keys en DB: <code id="key-storage">plaintext</code></p>
+</section>
+
+<section>
+  <h2>Escenario 2 · key válida sin scope</h2>
+  <p class="warn">Defensa en profundidad: una key <em>auténtica y activa</em> pero con permisos
+     mínimos puede leer (GET 200) pero no escribir (POST → 403 <code>insufficient_scope</code>,
+     auditado). Es el <strong>principio de mínimo privilegio</strong>: si toda key nace con los
+     scopes justos, una filtración futura no puede escribir — la blast radius queda acotada a lo
+     que la key ya podía hacer.</p>
+  <button id="scenario-btn" disabled>Escenario: key sin scope</button>
+  <p class="warn">Requiere hardening activo · Detener el ataque antes de lanzarlo · El bot usa esa
+     key: mirá el audit log y el feed (todo 403, DB sin basura).</p>
 </section>
 
 <section>

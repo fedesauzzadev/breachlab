@@ -92,29 +92,31 @@ function createLab({ file } = {}) {
   mkdirSync(path.dirname(dbFile), { recursive: true });
   const db = openDb(dbFile);
 
-  const base = Date.now();
   const insEntry = db.prepare(
     'INSERT INTO entries(kind, title, body, created_at) VALUES (?, ?, ?, ?)');
-  for (let i = 0; i < SEED_ENTRIES.length; i++) {
-    const [title, body] = SEED_ENTRIES[i];
-    insEntry.run('legit', title, body, new Date(base + i).toISOString());
-  }
-
-  // Exactamente 1 key en seed (contrato §2.4); key_plain = mala práctica visible (S05 migra a sha256).
-  // Status active: la key del leak FUNCIONA.
-  db.prepare(
-    "INSERT INTO api_keys(label, key_plain, key_hash, scope, status, created_at) VALUES (?, ?, NULL, NULL, 'active', ?)"
-  ).run('leaked-repo-config', leakedKey, new Date(base).toISOString());
-
-  // Timeline acto 1: 1 evento system + tráfico legítimo. CERO eventos de seguridad (AC2).
+  const insKey = db.prepare(
+    "INSERT INTO api_keys(label, key_plain, key_hash, scope, status, created_at) VALUES (?, ?, NULL, NULL, 'active', ?)");
   const insEvent = db.prepare(
     'INSERT INTO events(ts, kind, severity, message) VALUES (?, ?, ?, ?)');
-  insEvent.run(new Date(base).toISOString(), 'system', 'info',
-    `Sandbox iniciada · ${SEED_LEGIT_ENTRIES} registros legítimos · acto 1 (normal)`);
-  for (let i = 1; i <= SEED_TRAFFIC_EVENTS; i++) {
-    insEvent.run(new Date(base + i * 1000).toISOString(), 'traffic', 'info',
-      `GET /api/entries · 200 · key ${maskKey(leakedKey)}`);
-  }
+  // Seed del estado normal inicial (acto 1): lo usa el arranque y el reset del incidente (S08).
+  const seed = () => {
+    const base = Date.now();
+    for (let i = 0; i < SEED_ENTRIES.length; i++) {
+      const [title, body] = SEED_ENTRIES[i];
+      insEntry.run('legit', title, body, new Date(base + i).toISOString());
+    }
+    // Exactamente 1 key en seed (contrato §2.4); key_plain = mala práctica visible (S05 migra a sha256).
+    // Status active: la key del leak FUNCIONA.
+    insKey.run('leaked-repo-config', leakedKey, new Date(base).toISOString());
+    // Timeline acto 1: 1 evento system + tráfico legítimo. CERO eventos de seguridad (AC2).
+    insEvent.run(new Date(base).toISOString(), 'system', 'info',
+      `Sandbox iniciada · ${SEED_LEGIT_ENTRIES} registros legítimos · acto 1 (normal)`);
+    for (let i = 1; i <= SEED_TRAFFIC_EVENTS; i++) {
+      insEvent.run(new Date(base + i * 1000).toISOString(), 'traffic', 'info',
+        `GET /api/entries · 200 · key ${maskKey(leakedKey)}`);
+    }
+  };
+  seed();
   // State runtime: actos 1..5 (D-0004). currentMasked: la máscara vigente se guarda acá
   // porque con storage sha256 no se puede re-derivar desde la DB (S05).
   const state = { act: 1, currentMasked: maskKey(leakedKey) };
@@ -170,6 +172,17 @@ function createLab({ file } = {}) {
         if (legit) state.currentMasked = maskKey(r.key_plain);
       }
       return rows.length;
+    },
+    // S08 (N-0005): reinicio del incidente SIN reiniciar el proceso — vuelve al acto 1
+    // exacto: seed restaurado (12 legit + key original activa en plaintext), timeline y
+    // audit limpios (ids desde 1), flags y contadores en cero.
+    reset() {
+      db.exec('DELETE FROM entries; DELETE FROM events; DELETE FROM api_keys; DELETE FROM audit;');
+      seed();
+      state.act = 1;
+      state.currentMasked = maskKey(leakedKey);
+      state.attack = { running: false, requests: 0, blocked: 0, recent: [] };
+      state.flags = { killswitch: false, ratelimit: false, hardening: false, rotated: false };
     },
   };
   return api;

@@ -34,9 +34,10 @@ function buildApp(lab, attacker = createAttacker({ lab })) {
 
   // API víctima detrás de la cadena §2.1: rateLimit → apikey → contador → handler.
   const rateLimiter = createRateLimiter();
-  app.use('/api/entries', rateLimiter.middleware, createApiKeyAuth(lab), createEntriesRouter(lab));
-  // Consola del defensor (state, timeline, attack, firewall).
-  app.use('/api/lab', createLabRoutes(lab, attacker, rateLimiter));
+  const apiKeyAuth = createApiKeyAuth(lab);
+  app.use('/api/entries', rateLimiter.middleware, apiKeyAuth, createEntriesRouter(lab));
+  // Consola del defensor (state, timeline, attack, firewall, reset, escenario — S08).
+  app.use('/api/lab', createLabRoutes(lab, attacker, rateLimiter, apiKeyAuth));
 
   // El leak servido read-only: la "config versionada" con la key falsa (AC4, ADR D-0003 §6).
   app.get('/leak/config.json', (_req, res) => {

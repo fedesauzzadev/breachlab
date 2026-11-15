@@ -1,0 +1,89 @@
+# S08 — V1: narración sin fricción (N-0005 + N-0006) · cierra V1
+
+Fecha: 2026-11-15 · HEAD base: 441be28 · Node v24.19.0 · Windows (PowerShell)
+
+## 1. Instalación limpia + suite
+
+```
+$ npm ci
+  found 0 vulnerabilities
+$ npm test
+  tests 42 · pass 42 · fail 0 · duration_ms ~19.8s
+```
+(antes de S08: 37/37 · después: 42/42 — 5 tests nuevos en test/s08.test.js, incl. subtests)
+
+## 2. Walkthrough funcional (npm start + HTTP real en 127.0.0.1:3000)
+
+Nota: un proceso node viejo (código pre-S08, PID 25176) ocupaba el 3000 — se mató
+antes del walkthrough; todos los outputs de abajo son del server S08.
+
+### Modo guiado — hitos vía /api/lab/state (milestones)
+
+```
+[1] inicio: act=1 db=12/0 storage=plaintext
+    milestones: {"attack_started":false,"alert_fired":false,"firewalls_applied":false,"hardening_on":false,"reattack_bounced":false}
+[2] ataque+deteccion (attack start + 9 s): act=3 db=12/35 reqs=35
+    milestones: {"attack_started":true,"alert_fired":true,"firewalls_applied":false,"hardening_on":false,"reattack_bounced":false}
+[3] matafuegos+hardening (kill-switch, rotate, rate-limit, hardening):
+    act=5 storage=sha256
+    milestones: {"attack_started":true,"alert_fired":true,"firewalls_applied":true,"hardening_on":true,"reattack_bounced":true}
+    feed: 201×12 → 403×8 (transición visible: kill switch rebota al bot)
+```
+Los 5 hitos avanzan al cumplir cada paso; `reattack_bounced` dispara con los
+bloqueos NUEVOS posteriores al hardening (bot corriendo o re-ataque explícito).
+El panel (public/panel.js renderGuided) numera los pasos, resalta el siguiente
+(clase .next) y confirma los hechos (✓, clase .done) — verificado por código +
+milestones en state; el render DOM es vanilla sin build (sin headless browser en
+la fábrica, L-01 no lo exige).
+
+### Reset del incidente — SIN reiniciar el proceso
+
+```
+[7] ANTES  : act=5 db=12/63 storage=sha256 events=12 audit=20
+[8] reset  : 200 {"reset":true}            (POST /api/lab/reset, body {})
+[9] DESPUES: act=1 db=12/0 storage=plaintext key=sk_b…3a9c events=6 audit=0
+    milestones: todos false
+    timeline kinds: system,traffic,traffic,traffic,traffic,traffic   (solo seed acto 1)
+    health: {"status":"ok","db_entries":12,"act":1}  (mismo proceso, mismo puerto)
+```
+Mismo server responde antes y después → proceso NO reiniciado (AC N-0005).
+La demo re-corrió de punta a punta tras el reset ([10]..[14]).
+
+### Escenario 2 — key válida sin scope (N-0006)
+
+```
+[10] post-reset hardening: db=12/0
+[11] escenario: 202 {"scenario":"scopeless-key","running":true,"key_masked":"sk_b…3c53"}
+[12] escenario en DB limpia: db=12/0 audit=11 (0 basura nueva)
+     audit reasons: 403 insufficient_scope            (todas las filas)
+[13] key activa sin scope: GET=200 POST=403 insufficient_scope
+[14] reset final: act=1 db=12/0 — server vivo
+```
+Primer pasada (mismo server, pre-reset): feed del escenario 100% 403, audit
+20 filas `403 insufficient_scope` con la máscara de la key del escenario.
+Validaciones de frontera: body no vacío → 400; sin hardening → 400; ataque
+corriendo → 400 (cubiertas en tests).
+
+## 3. Tests nuevos (test/s08.test.js)
+
+- N-0005: hitos avanzan por /api/lab/state a lo largo de los 5 actos; reset
+  restaura seed (12 legit, key original activa plaintext, timeline 6 eventos
+  seed, audit 0, flags false, act 1, milestones false); proceso vivo
+  (server.listening + health); demo re-jugable (basura vuelve a crecer post-reset).
+- N-0006: 400 sin hardening / body inválido / ataque corriendo; 202 crea key
+  hasheada scope NULL activa; POSTs → 403 insufficient_scope auditados con la
+  máscara del escenario; GET 200; db.garbage === 0.
+
+## 4. Secrets gate (L-01)
+
+```
+$ gitleaks detect --source C:\repos\breachlab --no-git -c C:\repos\breachlab\.gitleaks.toml
+  INF scanned ~305994 bytes in 244ms
+  INF no leaks found
+  exit=0
+```
+(binario winget: C:\Users\hp\AppData\Local\Microsoft\WinGet\Packages\Gitleaks.Gitleaks_...\gitleaks.exe)
+
+## Veredicto
+
+AC de N-0005 y N-0006 cubiertas end-to-end con evidencia ejecutada. V1 completa.
