@@ -37,7 +37,7 @@
 <body>
 <header>
   <h1>🏭 BreachLab</h1>
-  <span class="sub">NSDD Software Factory · actualizado 2026-11-14 · post S04</span>
+  <span class="sub">NSDD Software Factory · actualizado 2026-11-14 · post S05</span>
 </header>
 <nav>
   <button class="on" data-t="mvp">MVP</button>
@@ -52,8 +52,8 @@
   <h2>Entregable MVP</h2>
   <div class="card"><ul>
     <li>Lab interactivo 100% local del incidente real: API key filtrada → ataque → detección → matafuegos → hardening (5 actos).</li>
-    <li>Estado actual: <b>S01..S04 implementados</b> — fin del slice-1 del PO: ataque + detección + tres matafuegos (kill switch 403 · rotación 401 · rate limit 429+Retry-After) con feed de códigos reales.</li>
-    <li>Pendiente del MVP: S05 hardening · S06 postmortem+DoD.</li>
+    <li>Estado actual: <b>S01..S05 implementados</b> — ciclo del incidente completo: hardening migra keys a sha256 (DB sin texto plano), scopes por endpoint, audit log; re-ataque rebota 19/19 con 0 basura nueva.</li>
+    <li>Pendiente del MVP: S06 postmortem EN + e2e + DoD vendible (cierra N-0004 y el MVP).</li>
     <li>Probar hoy: <span class="kbd">npm ci</span> + <span class="kbd">npm start</span> → <span class="kbd">http://127.0.0.1:3000</span></li>
     <li>Sandbox aislado: bind solo 127.0.0.1, keys 100% falsas, cero llamadas a terceros (verificado S01 con netstat+grep).</li>
   </ul></div>
@@ -74,8 +74,8 @@
     <div class="card"><h3>N-0003 · H-03 Matafuegos</h3><span class="chip st-implemented">implemented (S04, AC completas)</span><ul>
       <li class="li-ok">☑ Kill switch → 403, contadores frenan</li><li class="li-ok">☑ Rotación → key vieja muere (401), nueva solo máscara</li><li class="li-ok">☑ Rate limit → 429 + Retry-After (NFR-5 exacto en test)</li><li class="li-ok">☑ Cada acción → evento en timeline con efecto</li>
     </ul></div>
-    <div class="card"><h3>N-0004 · H-04 Hardening</h3><span class="chip st-planned">planned</span><ul>
-      <li>☐ Key como hash sha256, scope por endpoint</li><li>☐ Re-ataque rebota (401/403), 0 basura nueva</li><li>☐ Audit log con intentos bloqueados</li><li>☐ Postmortem EN legible</li>
+    <div class="card"><h3>N-0004 · H-04 Hardening</h3><span class="chip st-inprogress">implemented parcial (S05: AC1·AC2·AC3·AC5)</span><ul>
+      <li class="li-ok">☑ Key como hash sha256, scope por endpoint (DB sin plaintext)</li><li class="li-ok">☑ Re-ataque rebota (19/19 401), 0 basura nueva</li><li class="li-ok">☑ Audit log con intentos bloqueados (19 filas)</li><li>☐ Postmortem EN legible (S06)</li>
     </ul></div>
     <div class="card"><h3>N-0005 · H-05 Modo guiado + reinicio (V1)</h3><span class="chip st-planned">planned</span><ul><li>☐ Pasos numerados con siguiente resaltado</li><li>☐ Reiniciar incidente sin reiniciar proceso</li></ul></div>
     <div class="card"><h3>N-0006 · H-06 Escenario key sin scope (V1)</h3><span class="chip st-planned">planned</span><ul><li>☐ Key válida sin escritura → 403 + audit</li><li>☐ Panel conecta con mínimo privilegio</li></ul></div>
@@ -87,7 +87,7 @@
 <section id="roadmap">
   <h2>Entregas de valor</h2>
   <div class="timeline">
-    <div class="tl-item"><h3>V0 — MVP: el incidente completo (S01..S06)</h3><p>S01 Sandbox vivo <b style="color:var(--ok)">✓ entregado</b> · S02 Panel+docs+secrets <b style="color:var(--ok)">✓ entregado</b> · S03 Ataque+detección <b style="color:var(--ok)">✓ entregado</b> · S04 Matafuegos <b style="color:var(--ok)">✓ entregado</b> · S05 Hardening · S06 Postmortem+DoD — <i>en plan</i>. Valor: la demo completa de <5 min.</p></div>
+    <div class="tl-item"><h3>V0 — MVP: el incidente completo (S01..S06)</h3><p>S01 Sandbox vivo <b style="color:var(--ok)">✓ entregado</b> · S02 Panel+docs+secrets <b style="color:var(--ok)">✓ entregado</b> · S03 Ataque+detección <b style="color:var(--ok)">✓ entregado</b> · S04 Matafuegos <b style="color:var(--ok)">✓ entregado</b> · S05 Hardening <b style="color:var(--ok)">✓ entregado</b> · S06 Postmortem+DoD — <i>en plan</i>. Valor: la demo completa de <5 min.</p></div>
     <div class="tl-item"><h3>V1 — Narración sin fricción (S07)</h3><p>Modo guiado paso a paso + reinicio del incidente + escenario key-sin-scope. — <i>futuro</i>. Necesita: V0 aprobado.</p></div>
     <div class="tl-item"><h3>V2 — Serie de labs + export (S08)</h3><p>Nuevos vectores de filtración como escenarios elegibles + export de evidencia. — <i>futuro</i>. Necesita: V1.</p></div>
   </div>
@@ -96,7 +96,7 @@
 <section id="quality">
   <h2>Verificación y QA</h2>
   <div class="kpi">
-    <div class="card"><b>24/24</b>tests verdes (S01..S04)</div>
+    <div class="card"><b>31/31</b>tests verdes (S01..S05)</div>
     <div class="card"><b>0</b>findings gitleaks (gate activo)</div>
     <div class="card"><b>—</b>p95 — pendiente</div>
     <div class="card"><b>—</b>QA adversarial — pendiente (Fase 4)</div>
@@ -106,7 +106,7 @@
 
 <section id="learn">
   <h2>Bloqueos y aprendizajes</h2>
-  <div class="grid"><div class="card"><p class="empty">— pendiente — sin bloqueos escalados hasta ahora (S01: 1 intento fallido menor resuelto in-situ)</p></div></div>
+  <div class="grid"><div class="card"><h3>L-01 · gitleaks no persiste en PATH entre sesiones</h3><p>Gate de secrets se corre por ruta absoluta del binario winget (verificada) o reinstall por sesión. En fábrica: anotar la ruta verificada en el repo.</p></div></div>
 </section>
 
 <section id="decisions">
