@@ -6,7 +6,7 @@
 BreachLab: lab interactivo 100% local para porfolio personal - representa un incidente real de API key filtrada (ataque, deteccion, matafuegos, hardening) y su mitigacion. Spec: factory/spec.md.
 
 ## Active slice
-**MVP/V0 build COMPLETO (S01..S06) + QA gate SHIP CERRADO (2026-11-15).** QA adversarial de fabrica dio **VEREDICTO SHIP** (`factory/qa-report.md`): 0 criticos, 0 altos, 2 medios (M-1: script `npm run test:coverage` del plan no existe - cobertura real medida 97.75% lineas, umbral 70% cumplido; M-2: arranque con data/breachlab.db corrupto crashea con stack crudo, sin reseed ni log claro, sin test), 4 bajos (L-3 innerHTML en panel mitigado por llhttp; L-4 precedencia rate-limit/sobre auth no documentada; L-5 gitleaks fuera de PATH - L-01; L-6 mojibake cosmetico). Medido por QA: suite 36/36 desde instalacion limpia, walkthrough 5 actos **14.5 s** (gate 300 s), deteccion hit 31 a t+8.5 s, p95 GET /api/lab/state 16.4 ms y POST /api/entries 22.8 ms, NFR-5 exacto (25 rafaga = 10x2xx + 15x429 + Retry-After 15/15), gitleaks 0 findings, npm audit 0, netstat durante ataque: solo loopback. N-0001..N-0004 = `verified` (QA independiente, evidencia brain/evidence/QA-NN.txt). Round dev recomendado NO bloqueante (~30 min): M-1 + M-2 + opcional L-3. Proximo: review G2 con el Negocio. Plan tecnico: factory/plan.md (G1 cerrado).
+**S07 — CI GitHub Actions + identidad git (gh) + publicación prep** (D-0005, orden del Negocio en G2). MVP V0 **aprobado por el Negocio en G2** (2026-11-15, demo vista corriendo en browser). QA gate SHIP cerrado (`factory/qa-report.md`, `factory/scorecard.md`); rework post-QA aplicado (a1d0e97): M-1 script cobertura ✓ (97.82%), M-2 reseed DB corrupta ✓ (+1 test → suite 37/37), L-3 textContent ✓. Deuda menor abierta: L-4 (doc precedencia), L-5 (PATH gitleaks), L-6 (mojibake cosmético en nodos N-0002..N-0004). Después de S07: S08 = V1 (N-0005+N-0006), S09 = V2. Plan: factory/plan.md (G1 cerrado).
 
 ## Nodes
 | ID | Title | Type | Size | Status | Key links |
@@ -23,8 +23,8 @@ BreachLab: lab interactivo 100% local para porfolio personal - representa un inc
 ## Open risks / blockers
 - R1: la demo percibida como riesgo real - sandbox + escaneo de secrets como AC (N-0001). Ver factory/spec.md seccion Riesgos.
 - R2: narrativa confusa - el modo guiado (N-0005) queda V1; el MVP depende del timeline siempre visible. QA: walkthrough 14.5 s, narrativa fluida.
-- Stack resuelto: D-0002 (Node 24 + Express + node:sqlite, 1 dep) + D-0003 (arquitectura sandbox) + D-0004 (semantica del incidente). Se presenta al Negocio en G2.
-- Deuda post-gate (no bloquea SHIP, factory/qa-report.md): M-1 script cobertura + M-2 reseed DB corrupta (~30 min dev).
+- Stack resuelto: D-0002 (Node 24 + Express + node:sqlite, 1 dep) + D-0003 (arquitectura sandbox) + D-0004 (semantica del incidente). Presentado al Negocio en G2 (sin disenso, aprobado).
+- Riesgo publicacion: push a GitHub es gate humano (D-0005) - el Negocio decide publico/privado y pushea con su cuenta.
 
 ## Decisions
 | ID | Titulo | Reversibilidad |
@@ -33,6 +33,7 @@ BreachLab: lab interactivo 100% local para porfolio personal - representa un inc
 | D-0002 | Stack: Node 24 + Express + node:sqlite + vanilla, sin build step | medium |
 | D-0003 | Simulacion: un proceso, ataque por loopback HTTP real, aislamiento por bind | medium |
 | D-0004 | Semantica observable del incidente: codigos, umbrales y numeros | easy |
+| D-0005 | G2 aprobado + incrementos: CI Actions, identidad gh, publicacion prep, renumeracion S07/S08/S09 | easy |
 
 ## Registry highlights
-- (vacio - proyecto nuevo, sin shared code todavia)
+- `maskKey()` (src/lab.js): candidato 2/3 - ver brain/shared/registry.md antes de reusar/enmascarar keys.
