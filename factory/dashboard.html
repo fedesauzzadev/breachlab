@@ -37,7 +37,7 @@
 <body>
 <header>
   <h1>🏭 BreachLab</h1>
-  <span class="sub">NSDD Software Factory · actualizado 2026-11-15 · post S06 (MVP build completo, QA en curso)</span>
+  <span class="sub">NSDD Software Factory · actualizado 2026-11-15 · MVP completo · QA SHIP ✓ · G2 pendiente</span>
 </header>
 <nav>
   <button class="on" data-t="mvp">MVP</button>
@@ -52,10 +52,9 @@
   <h2>Entregable MVP</h2>
   <div class="card"><ul>
     <li>Lab interactivo 100% local del incidente real: API key filtrada → ataque → detección → matafuegos → hardening (5 actos).</li>
-    <li>Estado actual: <b>MVP/V0 build completo (S01..S06)</b> — los 5 actos end-to-end en 19 s: ataque, detección (8 s), matafuegos, hardening (DB sin plaintext), re-ataque rebotado, postmortem EN servido.</li>
-    <li>Verificación de build: 36/36 tests · walkthrough completo 19 s · gitleaks 0 findings · npm install limpia 0 vulns.</li>
-    <li>En curso: QA adversarial (Fase 4) — veredicto SHIP/NO-SHIP pendiente.</li>
-    <li>Probar: <span class="kbd">npm ci</span> + <span class="kbd">npm start</span> → <span class="kbd">http://127.0.0.1:3000</span></li>
+    <li><b>MVP/V0 completo y verificado — veredicto QA: SHIP.</b> Los 5 actos end-to-end: ataque con key filtrada, detección 8 s, matafuegos (kill switch/rotación/rate limit), hardening (sha256+scopes+audit), re-ataque rebotado, postmortem EN.</li>
+    <li>Rework post-QA aplicado: M-1 script cobertura · M-2 DB corrupta → reseed · L-3 textContent. Pendientes menores: L-4 (doc) · L-5 (PATH gitleaks) · L-6 (cosmético).</li>
+    <li>Probar: <span class="kbd">npm ci</span> + <span class="kbd">npm start</span> → <span class="kbd">http://127.0.0.1:3000</span> · panel en español, postmortem en <span class="kbd">/docs/postmortem.md</span></li>
     <li>Sandbox aislado: bind solo 127.0.0.1, keys 100% falsas, cero llamadas a terceros (verificado S01 con netstat+grep).</li>
   </ul></div>
 </section>
@@ -63,19 +62,19 @@
 <section id="kanban">
   <h2>Historias y estado</h2>
   <div class="grid">
-    <div class="card"><h3>N-0001 · H-01 Lab base</h3><span class="chip st-implemented">implemented (S01+S02, AC completas)</span><ul>
+    <div class="card"><h3>N-0001 · H-01 Lab base</h3><span class="chip st-verified">verified (S01+S02)</span><ul>
       <li class="li-ok">☑ Health OK, seed 12, 0 eventos de seguridad</li>
       <li class="li-ok">☑ Timeline cronológico · leak servido read-only</li>
       <li class="li-ok">☑ Cero red externa (netstat + grep)</li>
       <li class="li-ok">☑ READMEs EN/ES · botón panel "ver el leak"</li><li><span class="li-ok">☑ gitleaks 0 findings (validado con control negativo)</span></li>
     </ul></div>
-    <div class="card"><h3>N-0002 · H-02 Modo ataque</h3><span class="chip st-implemented">implemented (S03, AC completas)</span><ul>
+    <div class="card"><h3>N-0002 · H-02 Modo ataque</h3><span class="chip st-verified">verified (S03)</span><ul>
       <li class="li-ok">☑ Bot in-process con key filtrada, no se detiene solo</li><li class="li-ok">☑ Panel en vivo: basura crece en DB + feed de códigos</li><li class="li-ok">☑ Umbral → alerta roja (disparó en hit 31) + cooldown 15s</li><li class="li-ok">☑ Detener manual → estado degradado persiste</li>
     </ul></div>
-    <div class="card"><h3>N-0003 · H-03 Matafuegos</h3><span class="chip st-implemented">implemented (S04, AC completas)</span><ul>
+    <div class="card"><h3>N-0003 · H-03 Matafuegos</h3><span class="chip st-verified">verified (S04)</span><ul>
       <li class="li-ok">☑ Kill switch → 403, contadores frenan</li><li class="li-ok">☑ Rotación → key vieja muere (401), nueva solo máscara</li><li class="li-ok">☑ Rate limit → 429 + Retry-After (NFR-5 exacto en test)</li><li class="li-ok">☑ Cada acción → evento en timeline con efecto</li>
     </ul></div>
-    <div class="card"><h3>N-0004 · H-04 Hardening</h3><span class="chip st-implemented">implemented (S05+S06, AC completas)</span><ul>
+    <div class="card"><h3>N-0004 · H-04 Hardening</h3><span class="chip st-verified">verified (S05+S06)</span><ul>
       <li class="li-ok">☑ Key como hash sha256, scope por endpoint (DB sin plaintext)</li><li class="li-ok">☑ Re-ataque rebota, 0 basura nueva</li><li class="li-ok">☑ Audit log con intentos bloqueados</li><li class="li-ok">☑ Postmortem EN (6.9 KB, servido + linkeado)</li>
     </ul></div>
     <div class="card"><h3>N-0005 · H-05 Modo guiado + reinicio (V1)</h3><span class="chip st-planned">planned</span><ul><li>☐ Pasos numerados con siguiente resaltado</li><li>☐ Reiniciar incidente sin reiniciar proceso</li></ul></div>
@@ -88,7 +87,7 @@
 <section id="roadmap">
   <h2>Entregas de valor</h2>
   <div class="timeline">
-    <div class="tl-item"><h3>V0 — MVP: el incidente completo (S01..S06)</h3><p>S01 Sandbox vivo <b style="color:var(--ok)">✓ entregado</b> · S02 Panel+docs+secrets <b style="color:var(--ok)">✓ entregado</b> · S03 Ataque+detección <b style="color:var(--ok)">✓ entregado</b> · S04 Matafuegos <b style="color:var(--ok)">✓ entregado</b> · S05 Hardening <b style="color:var(--ok)">✓ entregado</b> · S06 Postmortem+DoD <b style="color:var(--ok)">✓ entregado</b> — MVP/V0 build completo, QA pendiente. Valor: la demo completa de <5 min.</p></div>
+    <div class="tl-item done"><h3>V0 — MVP: el incidente completo (S01..S06)</h3><p>S01..S06 <b style="color:var(--ok)">✓ todos entregados y verificados</b> (S01 sandbox · S02 panel+docs+secrets · S03 ataque+detección · S04 matafuegos · S05 hardening · S06 postmortem+DoD). Valor: la demo completa de <5 min — <b style="color:var(--ok)">SHIP, esperando G2</b>.</p></div>
     <div class="tl-item"><h3>V1 — Narración sin fricción (S07)</h3><p>Modo guiado paso a paso + reinicio del incidente + escenario key-sin-scope. — <i>futuro</i>. Necesita: V0 aprobado.</p></div>
     <div class="tl-item"><h3>V2 — Serie de labs + export (S08)</h3><p>Nuevos vectores de filtración como escenarios elegibles + export de evidencia. — <i>futuro</i>. Necesita: V1.</p></div>
   </div>
@@ -97,17 +96,22 @@
 <section id="quality">
   <h2>Verificación y QA</h2>
   <div class="kpi">
-    <div class="card"><b>36/36</b>tests verdes (MVP completo)</div>
-    <div class="card"><b>0</b>findings gitleaks (gate activo)</div>
-    <div class="card"><b>—</b>p95 — pendiente</div>
-    <div class="card"><b>—</b>QA adversarial — pendiente (Fase 4)</div>
-    <div class="card"><b>—</b>veredicto SHIP/NO-SHIP — pendiente</div>
+    <div class="card"><b>37/37</b>tests verdes (suite MVP)</div>
+    <div class="card"><b>97.8%</b>cobertura líneas (umbral 70%)</div>
+    <div class="card"><b>16/23 ms</b>p95 GET state / POST entries (umbral 200)</div>
+    <div class="card"><b>0/0/2*</b>hallazgos QA crit/high/medium (*resueltos)</div>
+    <div class="card"><b style="color:var(--ok)">SHIP</b>veredicto QA adversarial</div>
+    <div class="card"><b>14.5 s</b>walkthrough 5 actos (gate 300 s)</div>
+    <div class="card"><b>0</b>findings gitleaks · 0 vulns npm audit</div>
   </div>
 </section>
 
 <section id="learn">
   <h2>Bloqueos y aprendizajes</h2>
-  <div class="grid"><div class="card"><h3>L-01 · gitleaks no persiste en PATH entre sesiones</h3><p>Gate de secrets se corre por ruta absoluta del binario winget (verificada) o reinstall por sesión. En fábrica: anotar la ruta verificada en el repo.</p></div></div>
+  <div class="grid">
+    <div class="card"><h3>L-01 · gitleaks no persiste en PATH entre sesiones</h3><p>Gate de secrets se corre por ruta absoluta del binario winget (verificada) o reinstall por sesión. En fábrica: anotar la ruta verificada en el repo.</p></div>
+    <div class="card"><h3>L-02 · Sesión muerta por límite de uso</h3><p>S06 se construyó en una sesión que murió por usage limit sin commitear. Lección: commits incrementales por slice ANTES de la verificación final; la sesión siguiente auditó y re-verificó desde cero (recuperación barata porque el brain tenía el estado).</p></div>
+  </div>
 </section>
 
 <section id="decisions">
