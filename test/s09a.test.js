@@ -84,6 +84,16 @@ for (const id of ['server-log', 'frontend-bundle']) {
 
     await post('/api/lab/attack', { action: 'start' }); // ataque con la key DEL VECTOR
     assert.equal((await post(`/api/lab/scenarios/${id}`, {})).status, 400, 'ataque corriendo');
+    // CI lento (Windows 2 cores, tests en paralelo): el bot puede starvearse y no sostener
+    // 4 rps, y la ventana de 10 s nunca junta 31 hits. Bombeo directo con la key DEL VECTOR
+    // (patrón S03) — la detección deja de depender de la tasa del bot.
+    for (let i = 0; i <= DETECTION_MAX_REQUESTS; i++) {
+      await fetch(base + '/api/entries', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-api-key': sc.key },
+        body: JSON.stringify({ title: `pump-${i}`, body: 'deterministic detection pump' }),
+      });
+    }
     const budget = DETECTION_WINDOW_MS + (DETECTION_MAX_REQUESTS + 2) * BOT_INTERVAL_MS + 5000;
     const s3 = await until(async () => ((await state()).act === 3 ? await state() : null), budget, `detección (${id})`);
     assert.ok(s3.db.garbage >= DETECTION_MAX_REQUESTS - 1); // la basura creció con SU key
