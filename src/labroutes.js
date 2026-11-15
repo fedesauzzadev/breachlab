@@ -2,6 +2,8 @@
 // Consola del defensor /api/lab/* (contrato §2.4): state, timeline y control del ataque.
 // Sin key: solo existe en loopback (ADR D-0003). Números: ADR D-0004.
 const express = require('express');
+const { readFileSync } = require('node:fs');
+const path = require('node:path');
 const { randomBytes } = require('node:crypto');
 const { maskKey, sha256Hex } = require('./lab');
 const { SCENARIOS, scenarioList } = require('./scenarios');
@@ -209,6 +211,49 @@ function createLabRoutes(lab, attacker, rateLimiter, auth = null) {
   router.get('/audit', (req, res) => {
     const since = Number.parseInt(req.query.since, 10);
     res.json({ attempts: lab.listAudit(Number.isInteger(since) ? since : 0) });
+  });
+
+  // S09 (N-0008): export de evidencia — UN archivo markdown legible generado acá con
+  // el estado vivo: timeline completo + audit log + resumen del postmortem. Descarga
+  // local (Content-Disposition attachment): nada sale del sandbox, cero deps nuevas.
+  router.get('/export', (_req, res) => {
+    const s = lab.state;
+    const a = s.attack || { requests: 0, blocked: 0 };
+    const f = s.flags || {};
+    const sc = SCENARIOS[s.scenarioId];
+    const counts = { legit: 0, garbage: 0 };
+    for (const row of byKind.all()) counts[row.kind] = row.n;
+    const current = activeKey.get();
+    const events = lab.listEvents();
+    const attempts = lab.listAudit();
+    // Resumen del postmortem: la sección Summary del doc real, verbatim.
+    const pm = readFileSync(path.join(__dirname, '..', 'docs', 'postmortem.md'), 'utf8');
+    const summary = (pm.match(/^## Summary\s*\n([\s\S]*?)(?=\n^## )/m) || [])[1] || '';
+    const now = new Date().toISOString();
+    const lines = [
+      '# BreachLab — Evidencia del incidente', '',
+      `> Exportado: ${now} · Vector de filtración: ${sc.name} · Acto: ${s.act} de 5`,
+      '> Simulación 100% local (loopback 127.0.0.1): todas las keys son falsas (FAKE BY DESIGN).', '',
+      '## Estado al exportar', '',
+      `- DB: ${counts.legit} registros legítimos · ${counts.garbage} basura`,
+      `- Ataque: ${a.requests} requests · ${a.blocked} bloqueados`,
+      `- Matafuegos: kill switch ${f.killswitch ? '✓' : '✗'} · rotación ${f.rotated ? '✓' : '✗'} · rate limit ${f.ratelimit ? '✓' : '✗'} · hardening ${f.hardening ? '✓' : '✗'}`,
+      `- Keys: almacenamiento ${f.hardening ? 'sha256' : 'plaintext'} · filtrada ${maskKey(sc.key)} · vigente ${(f.hardening ? s.currentMasked : (current && current.key_plain ? maskKey(current.key_plain) : '—'))}`, '',
+      `## Timeline (${events.length} eventos)`, '',
+      '| # | Hora (UTC) | Tipo | Severidad | Mensaje |', '|---|---|---|---|---|',
+      ...events.map((e) => `| ${e.id} | ${e.ts} | ${e.kind} | ${e.severity} | ${e.message} |`), '',
+      `## Audit log (${attempts.length} intentos bloqueados)`, '',
+      ...(attempts.length
+        ? ['| # | Hora (UTC) | Key | Método | Endpoint | Status | Motivo |', '|---|---|---|---|---|---|---|',
+          ...attempts.map((x) => `| ${x.id} | ${x.ts} | ${x.key_masked} | ${x.method} | ${x.endpoint} | ${x.status} | ${x.reason} |`)]
+        : ['Sin intentos bloqueados registrados (hardening sin activar, o nada rebotó aún).']), '',
+      '## Resumen del postmortem', '',
+      summary.trim(), '',
+      'Relato completo: docs/postmortem.md (EN) en el repo.', '',
+    ];
+    res.setHeader('content-disposition',
+      `attachment; filename="breachlab-evidence-${now.replace(/[:.]/g, '-')}.md"`);
+    res.type('text/markdown').send(lines.join('\n'));
   });
 
   return router;

@@ -3,6 +3,25 @@
 Format based on [Keep a Changelog](https://keepachangelog.com/); versioning follows
 [SemVer](https://semver.org/).
 
+## [0.3.0] — 2026-11-15
+V2: from a single demo to a series of labs — plus shareable evidence.
+
+### Added
+- **S09 — Leak-vector series.** BreachLab is now a *series of labs*: pick how the
+  key leaked from the panel's scenario selector and replay the same 5-act incident
+  on that vector. Three concrete vectors, each with its own fake key, read-only leak
+  evidence and act-1 timeline narration: the original **versioned config** (base),
+  an **exposed server error log** (crash stack trace with a full environment dump —
+  `/leak/error.log`), and a **legacy frontend bundle** with the key hardcoded in the
+  JS served to every visitor (`/leak/legacy-bundle.js`). Selecting a vector reseeds
+  the incident for that story; the attack/detection/response/hardening engine is
+  unchanged. `GET /api/lab/scenarios` + `POST /api/lab/scenarios/:id`.
+- **S09 — Evidence export.** One button, one file: `GET /api/lab/export` generates
+  a markdown report server-side (Content-Disposition attachment) with the lab state,
+  the **complete timeline**, the **audit log** and the postmortem summary — a third
+  party reconstructs the incident chronology without running anything. Nothing
+  leaves the machine.
+
 ## [0.2.1] — 2026-11-15
 G3 feedback fix: the attacker is no longer an endless loop.
 

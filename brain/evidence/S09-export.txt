@@ -1,0 +1,38 @@
+# S09b — N-0008: export de evidencia del incidente
+Fecha: 2026-11-15 · base: 71530ef (S09a) · Node v24.19.0
+
+## Qué se corrió (verificación real)
+
+1. `npm test` → **52/52 pass, 0 fail** (test/s09b.test.js nuevo):
+   - AC1 acto 1: GET /api/lab/export → 200, `content-type: text/markdown`,
+     `content-disposition: attachment; filename="breachlab-evidence-…\.md"`, audit vacío
+     narrado ("Sin intentos bloqueados registrados"), nota FAKE BY DESIGN.
+   - AC1/AC2 con incidente real: ataque → detección → kill-switch → hardening →
+     re-ataque auditado → export contiene TODO evento del timeline (assert por mensaje),
+     TODO rebote del audit (key/motivo/endpoint), header `## Timeline (N eventos)` y
+     `## Audit log (N intentos bloqueados)` con N exacto, sección `## Resumen del
+     postmortem` con el Summary verbatim del doc y estado vivo (requests/blocked/storage).
+2. Walkthrough server efímero PORT=4002, vector frontend-bundle, ciclo completo:
+   - Headers reales: `HTTP/1.1 200` · `content-disposition: attachment;
+     filename="breachlab-evidence-2026-11-15T15-36-16-056Z.md"` · `Content-Type:
+     text/markdown; charset=utf-8`.
+   - Archivo descargado a disco (curl -o) y estructura inspeccionada:
+     `# BreachLab — Evidencia del incidente` → `## Estado al exportar` (vector, acto,
+     DB, matafuegos, keys) → `## Timeline (11 eventos)` (incluye narración warning del
+     vector frontend-bundle) → `## Audit log (20 intentos bloqueados)` (filas
+     `POST /api/entries | 403 | key_disabled` con máscara sk_b…2a6b) → `## Resumen del
+     postmortem` → link a docs/postmortem.md.
+3. gitleaks (ruta absoluta L-01) tras el slice completo: no leaks found.
+
+## Notas
+- Mojibake en consola = encoding de display de PowerShell; el archivo es UTF-8 (los
+  asserts del test validan los caracteres reales: em-dash, máscara con …).
+- Con hardening y sin rotación previa, "vigente" muestra la máscara de la key filtrada
+  (no hay key legítima activa): semántica heredada de S05, cosmético.
+
+## AC cubiertas
+- N-0008 AC1 (botón → archivo local legible timeline+audit+resumen postmortem, sin
+  salir del sandbox): endpoint GET /api/lab/export server-side + botón en panel.
+  Descarga real verificada.
+- N-0008 AC2 (tercero reconstruye cronología sin correr la demo): todo evento y todo
+  rebote presentes en el archivo (assert por elemento en test).

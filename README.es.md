@@ -33,7 +33,15 @@ Abrí **http://127.0.0.1:3000** — sin configuración, sin variables de entorno
 
 Manejas toda la respuesta desde el panel; los 401/403/429 que ves son respuestas HTTP reales producidas por los middlewares — no efectos de UI.
 
-**Nuevo en v0.2.0:** el panel corre ahora en **modo guiado** — un checklist de 5 hitos que recorre el incidente acto por acto, la forma recomendada de correr esta demo frente a reclutadores. Un botón de **reset** restaura el seed exacto del acto 1 sin reiniciar el proceso (replay inmediato), y un **segundo escenario** (lab endurecido donde una key válida sin scope de escritura rebota `403` auditados) cuenta la historia del mínimo privilegio.
+**Nuevo en v0.3.0:** BreachLab es ahora una **serie de labs** — elegí cómo se filtró la
+key (config versionada · log de errores del server expuesto · bundle del frontend
+legacy) y rejugá el mismo incidente en 5 actos sobre ese vector, cada uno con su
+evidencia de leak y su narración. Después **exportá la evidencia**: un archivo markdown
+con el timeline completo, el audit log y el resumen del postmortem, generado
+server-side y descargado localmente — un tercero reconstruye el incidente sin correr
+nada. **v0.2.0:** modo guiado con hitos automáticos (la forma recomendada de narrar la
+demo frente a reclutadores), reinicio del incidente al instante y un segundo escenario
+que cuenta la historia del mínimo privilegio.
 
 **Leé el relato completo después de la demo: [postmortem del incidente](docs/postmortem.md)** (EN) — cronología, impacto, causa raíz, respuesta rápida y mitigaciones estructurales, redactado como reporte profesional.
 

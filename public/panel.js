@@ -221,6 +221,10 @@
     method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}',
   }).catch(() => {}));
 
+  // S09 (N-0008): export local — el server genera el markdown (timeline + audit +
+  // resumen del postmortem) y el navegador lo descarga como attachment. Sin salir del sandbox.
+  $('export-btn').addEventListener('click', () => { window.location.href = '/api/lab/export'; });
+
   pollState();
   pollTimeline();
   pollAudit();
