@@ -2,7 +2,7 @@
 // Núcleo del lab (plan §2.3): node:sqlite — schema, seed fijo y estado runtime. Números: ADR D-0004.
 const { mkdirSync, readFileSync } = require('node:fs');
 const path = require('node:path');
-const { randomBytes } = require('node:crypto');
+const { createHash, randomBytes } = require('node:crypto');
 const { DatabaseSync } = require('node:sqlite');
 
 const SEED_LEGIT_ENTRIES = 12; // D-0004: cantidad fija y documentada
@@ -34,6 +34,11 @@ function maskKey(key) {
   return `${key.slice(0, 4)}…${key.slice(-4)}`;
 }
 
+function sha256Hex(key) {
+  // S05 hardening (§2.5): así — y solo así — queda la key en la DB. node:crypto nativo.
+  return createHash('sha256').update(key).digest('hex');
+}
+
 function createLab({ file } = {}) {
   const dbFile = file || path.join(__dirname, '..', 'data', 'breachlab.db');
   mkdirSync(path.dirname(dbFile), { recursive: true });
@@ -44,6 +49,7 @@ function createLab({ file } = {}) {
     DROP TABLE IF EXISTS entries;
     DROP TABLE IF EXISTS events;
     DROP TABLE IF EXISTS api_keys;
+    DROP TABLE IF EXISTS audit;
     CREATE TABLE entries(
       id INTEGER PRIMARY KEY,
       kind TEXT NOT NULL CHECK(kind IN ('legit','garbage')),
@@ -61,6 +67,11 @@ function createLab({ file } = {}) {
       label TEXT NOT NULL, key_plain TEXT, key_hash TEXT, scope TEXT,
       status TEXT NOT NULL CHECK(status IN ('active','revoked','disabled')),
       created_at TEXT NOT NULL
+    );
+    CREATE TABLE audit(
+      id INTEGER PRIMARY KEY,
+      ts TEXT NOT NULL, key_masked TEXT NOT NULL, method TEXT NOT NULL,
+      endpoint TEXT NOT NULL, status INTEGER NOT NULL, reason TEXT NOT NULL
     );
   `);
 
@@ -87,21 +98,28 @@ function createLab({ file } = {}) {
     insEvent.run(new Date(base + i * 1000).toISOString(), 'traffic', 'info',
       `GET /api/entries · 200 · key ${maskKey(leakedKey)}`);
   }
-  return {
+  // State runtime: actos 1..5 (D-0004). currentMasked: la máscara vigente se guarda acá
+  // porque con storage sha256 no se puede re-derivar desde la DB (S05).
+  const state = { act: 1, currentMasked: maskKey(leakedKey) };
+
+  const api = {
     db,
-    state: { act: 1 }, // actos 1..5 (D-0004); S01 vive siempre en acto 1
+    state,
     countEntries: () => db.prepare('SELECT COUNT(*) AS n FROM entries').get().n,
     listEntries: () =>
       db.prepare('SELECT id, kind, title, body, created_at FROM entries ORDER BY id').all(),
     listEvents: (since = 0) =>
       db.prepare('SELECT id, ts, kind, severity, message FROM events WHERE id > ? ORDER BY id')
         .all(since),
-    isKeyActive: (key) =>
-      !!db.prepare("SELECT 1 FROM api_keys WHERE key_plain = ? AND status = 'active'").get(key),
+    listAudit: (since = 0) =>
+      db.prepare('SELECT id, ts, key_masked, method, endpoint, status, reason FROM audit WHERE id > ? ORDER BY id')
+        .all(since),
     maskKey,
     // S04 matafuegos (§2.5): acciones sobre la key COMPROMETIDA — el leak del artefacto repo-sim.
     killSwitch: () => {
-      db.prepare("UPDATE api_keys SET status = 'disabled' WHERE key_plain = ?").run(leakedKey);
+      // Post-hardening el plain ya no existe: matchea también por hash (§2.5).
+      db.prepare("UPDATE api_keys SET status = 'disabled' WHERE key_plain = ? OR key_hash = ?")
+        .run(leakedKey, sha256Hex(leakedKey));
       return maskKey(leakedKey);
     },
     rotateKey: () => {
@@ -109,12 +127,35 @@ function createLab({ file } = {}) {
       db.prepare("UPDATE api_keys SET status = 'revoked' WHERE status = 'active'").run();
       // Nueva key falsa con el prefijo propio (FAKE BY DESIGN, allowlist gitleaks).
       const fresh = `sk_breachlab_demo_ROTATED_${randomBytes(8).toString('hex')}`;
-      db.prepare(
-        "INSERT INTO api_keys(label, key_plain, status, created_at) VALUES ('rotated', ?, 'active', ?)"
-      ).run(fresh, new Date().toISOString());
-      return maskKey(fresh); // solo la máscara sale del lab
+      if (state.flags && state.flags.hardening) {
+        // Con hardening activo la key NACE hasheada y con scope: jamás reintroduce plain.
+        db.prepare(
+          "INSERT INTO api_keys(label, key_hash, scope, status, created_at) VALUES ('rotated', ?, 'write:entries', 'active', ?)"
+        ).run(sha256Hex(fresh), new Date().toISOString());
+      } else {
+        db.prepare(
+          "INSERT INTO api_keys(label, key_plain, status, created_at) VALUES ('rotated', ?, 'active', ?)"
+        ).run(fresh, new Date().toISOString());
+      }
+      state.currentMasked = maskKey(fresh); // solo la máscara sale del lab
+      return state.currentMasked;
+    },
+    // S05 (§2.5): migración one-shot plain→sha256 en DB. La key del leak queda SIN scope
+    // aunque siga active — D-0004: re-ataque sin rotación previa rebota 403 por alcance.
+    hardenKeys: () => {
+      const rows = db.prepare(
+        'SELECT id, key_plain, status FROM api_keys WHERE key_plain IS NOT NULL').all();
+      const upd = db.prepare(
+        'UPDATE api_keys SET key_hash = ?, key_plain = NULL, scope = ? WHERE id = ?');
+      for (const r of rows) {
+        const legit = r.status === 'active' && r.key_plain !== leakedKey;
+        upd.run(sha256Hex(r.key_plain), legit ? 'write:entries' : null, r.id);
+        if (legit) state.currentMasked = maskKey(r.key_plain);
+      }
+      return rows.length;
     },
   };
+  return api;
 }
 
-module.exports = { createLab, maskKey, SEED_LEGIT_ENTRIES };
+module.exports = { createLab, maskKey, sha256Hex, SEED_LEGIT_ENTRIES };

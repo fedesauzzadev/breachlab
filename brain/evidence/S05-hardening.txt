@@ -1,0 +1,101 @@
+# S05 — Hardening (N-0004 parte A: AC1·AC2·AC3·AC5) · 2026-11-14
+
+Node v24.19.0 · Windows · loopback 127.0.0.1:3457 (PORT opt-in del walkthrough)
+
+## 1. Instalación limpia + suite
+
+```
+$ npm ci
+  found 0 vulnerabilities
+
+$ npm test            # node --test (toda la suite: lab + attack + firewall + hardening)
+  ℹ tests 31  pass 31  fail 0        # era 24/24 en S04; +7 de test/hardening.test.js
+```
+
+## 2. Walkthrough funcional (server real, curl por HTTP a loopback)
+
+```
+$ PORT=3457 npm start
+  [breachlab] http://127.0.0.1:3457 — sandbox local · acto 1 (normal)
+
+GET /api/health
+  {"status":"ok","db_entries":12,"act":1}
+
+POST /api/lab/attack {"action":"start"} → 202 {"running":true}
+  (11 s de ataque: bot 4 req/s con la key del leak, umbral >30/10s cruzado)
+GET /api/lab/state
+  act:3 · requests:56 · blocked:0 · db:{legit:12,garbage:56}
+  flags.hardening:false · keys.storage:"plaintext" · recent: 20×201
+POST /api/lab/attack {"action":"stop"} → 202 {"running":false}
+
+POST /api/lab/firewall/rotate-key {} → 200 {"new_key_masked":"sk_b…5b7f"}
+POST /api/lab/hardening {"enabled":true} → 200 {"hardening":true,"keys_hashed":2}
+GET /api/lab/state
+  act:5 · flags:{hardening:true,rotated:true} · keys.storage:"sha256"
+  keys.current_masked:"sk_b…5b7f" · db.garbage:56 (congelado)
+```
+
+## 3. AC1 — la DB ya no tiene texto plano (dump con node:sqlite, server vivo)
+
+```
+SELECT label, key_plain, substr(key_hash,1,16)||'...' AS key_hash_16, scope, status FROM api_keys
+┌───┬──────────────────────┬───────────┬───────────────────────┬─────────────────┬──────────┐
+│ 0 │ 'leaked-repo-config' │ null      │ 'e03b5229f7a495b4...' │ null            │ 'revoked'│
+│ 1 │ 'rotated'            │ null      │ '551e5c65bab9558d...' │ 'write:entries' │ 'active' │
+└───┴──────────────────────┴───────────┴───────────────────────┴─────────────────┴──────────┘
+filas con key_plain NO nulo: 0        ← cero texto plano en TODA la tabla
+```
+
+## 4. AC2+AC5 — re-ataque con la key filtrada original (bot relee el leak)
+
+```
+POST /api/lab/attack {"action":"start"} → 202   (5 s de re-ataque)
+GET /api/lab/state
+  requests: 56→75 (+19)  ·  blocked: 0→19  ·  db.garbage: 56 (CERO basura nueva)
+  act:5 · storage:"sha256"
+  recent (feed): 201,401,401,401,401,401,401,401,401,401,401,401,401,401,401,401,401,401,401,401
+                └── 100% de los 19 intentos rebotados con 401 (key rotada → revoked)
+POST /api/lab/attack {"action":"stop"} → 202
+```
+
+## 5. AC3 — audit log: una fila por intento bloqueado (solo con hardening activo)
+
+```
+GET /api/lab/audit
+  total intentos auditados: 19
+  primeras filas (todas idénticas en forma):
+  {"id":1,"ts":"2026-11-15T02:18:30.518Z","key_masked":"sk_b…3a9c","method":"POST",
+   "endpoint":"/api/entries","status":401,"reason":"invalid_api_key"}
+  {"id":2,"ts":"2026-11-15T02:18:30.782Z", ... igual ...}
+```
+
+Antes del hardening la tabla `audit` quedó en 0 filas pese a los rebotes 401/403
+de S03/S04 — cubierto por test (`AC3 tabla audit SOLO con hardening activo`).
+
+## 6. Panel (acto 5 visible)
+
+```
+GET /  → HTML contiene: botón #fw-harden, sección Audit log (#audit), #key-storage
+GET /panel.js → contiene pollAudit + setInterval(pollAudit, 1000)
+  badge acto 5 "Sistema endurecido" (ok/verde) + "Hardening ✓ ON" tras activar
+  (estado cargado por polling desde /api/lab/state — sin fingir nada en la UI)
+```
+
+## 7. Tests nuevos (test/hardening.test.js — 7)
+
+| Test | AC | Verifica |
+|---|---|---|
+| AC1 hardening: DB pasa a sha256 | AC1 | plain NULL en todas las filas, key_hash === sha256(key) exacto, scope solo vigente, 201 con la legítima, storage sha256, acto 5 |
+| AC2 sin rotación → 403 insufficient_scope | AC2 | leak aún active sin scope → POST 403 + GET 200 + fila audit |
+| AC2+AC5 re-ataque | AC2·AC5 | 100% 401 en feed, blocked crece, garbage congelado, audit fila por intento |
+| AC3 audit solo con hardening | AC3 | rebotes previos (401/403 vulnerable) → 0 filas; post-hardening → 1 |
+| AC3 GET /audit | AC3 | ids ascendentes, máscara "—" sin key, ?since= incremental |
+| rotar post-hardening | AC1 | nueva key nace hasheada con scope, 0 plain en DB, leak → 401 |
+| validación 400 | §2.4 | bodies inválidos → 400 invalid_request |
+
+## Conclusión
+
+AC1 ✓ (dump: plain NULL, sha256 en DB) · AC2 ✓ (19/19 rebotados, 0 basura) ·
+AC3 ✓ (19 filas audit con ts/key_masked/endpoint/motivo, tabla vacía sin hardening) ·
+AC5 ✓ (acto 5, basura congelada, panel endurecido con audit visible).
+AC4 (postmortem EN) → S06. N-0004 queda `implemented` (parcial), sin cerrar.

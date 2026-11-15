@@ -31,6 +31,10 @@
       $('fw-kill').textContent = s.flags.killswitch ? 'Kill switch ✓ ON' : 'Kill switch';
       $('fw-rate').disabled = s.flags.ratelimit;
       $('fw-rate').textContent = s.flags.ratelimit ? 'Rate limit ✓ ON' : 'Rate limit';
+      // S05 hardening: botón + storage de keys (AC1) — el estado "endurecido" es el badge acto 5.
+      $('fw-harden').disabled = s.flags.hardening;
+      $('fw-harden').textContent = s.flags.hardening ? 'Hardening ✓ ON' : 'Activar hardening';
+      $('key-storage').textContent = s.keys.storage;
       $('key-current').textContent = s.keys.current_masked || '—';
       const feed = $('feed'); // códigos HTTP REALES del bot (base del relato de S04)
       feed.hidden = s.attack.recent.length === 0;
@@ -84,6 +88,31 @@
   $('fw-rotate').addEventListener('click', () => firewall('rotate-key', {}));
   $('fw-rate').addEventListener('click', () => firewall('rate-limit', { enabled: true }));
 
+  // S05 hardening (N-0004): la migración plain→sha256 + scope pasa por el lab; el efecto
+  // (rebotes 401/403 auditados) llega al feed y al audit log por polling — no se finge acá.
+  $('fw-harden').addEventListener('click', () => fetch('/api/lab/hardening', {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ enabled: true }),
+  }).catch(() => {}));
+
+  // Audit log incremental (AC3): intentos bloqueados desde el último id.
+  let lastAuditId = 0;
+  async function pollAudit() {
+    try {
+      const { attempts } = await (await fetch(`/api/lab/audit?since=${lastAuditId}`)).json();
+      const ul = $('audit');
+      for (const a of attempts) {
+        const li = document.createElement('li');
+        li.innerHTML = `<span class="ts">${new Date(a.ts).toLocaleTimeString()}</span>` +
+          `<span><code class="c4xx">${a.status}</code> ${a.method} ${a.endpoint}` +
+          ` · key <code>${a.key_masked}</code> · ${a.reason}</span>`;
+        ul.appendChild(li);
+        lastAuditId = a.id;
+      }
+      ul.scrollTop = ul.scrollHeight;
+    } catch { /* pollState ya reporta la desconexión */ }
+  }
+
   // El leak: la config "versionada" con la key falsa (AC4, FAKE BY DESIGN).
   $('leak-btn').addEventListener('click', async () => {
     const pre = $('leak');
@@ -95,6 +124,8 @@
 
   pollState();
   pollTimeline();
+  pollAudit();
   setInterval(pollState, 1000);   // polling 1s (plan §2.1)
   setInterval(pollTimeline, 1000);
+  setInterval(pollAudit, 1000);
 })();

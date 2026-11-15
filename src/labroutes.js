@@ -30,8 +30,11 @@ function createLabRoutes(lab, attacker, rateLimiter) {
       flags: lab.state.flags,
       keys: {
         leaked_masked: maskKey(leakedKey),
-        current_masked: current && current.key_plain ? maskKey(current.key_plain) : null,
-        storage: 'plaintext', // S03: mala práctica visible; S05 migra a sha256
+        // Con hardening el plain no existe: la máscara se guardó al migrar/rotar (lab.js).
+        current_masked: lab.state.flags.hardening
+          ? lab.state.currentMasked
+          : (current && current.key_plain ? maskKey(current.key_plain) : null),
+        storage: lab.state.flags.hardening ? 'sha256' : 'plaintext', // S05: §2.5
       },
       thresholds: {
         detection_max_requests: DETECTION_MAX_REQUESTS,
@@ -101,6 +104,24 @@ function createLabRoutes(lab, attacker, rateLimiter) {
     lab.state.flags.ratelimit = true;
     firewallAction(`Rate limit ON · ${max} req / ${windowMs / 1000} s por key · exceso → 429`);
     res.json({ ratelimit: true, max, window_ms: windowMs });
+  });
+
+  // S05 hardening (§2.4/§2.5): migra las keys a sha256 (plain → NULL), scope write:entries
+  // solo para la vigente y audit de cada rebote. Acto 5: firme a futuro.
+  router.post('/hardening', (req, res) => {
+    if (!req.body || req.body.enabled !== true) return bad(res, 'enabled debe ser true');
+    const keys_hashed = lab.hardenKeys();
+    lab.state.flags.hardening = true;
+    lab.state.act = 5;
+    insAction.run(new Date().toISOString(),
+      `Hardening ON · ${keys_hashed} key(s) migradas a sha256 (key_plain → NULL) · scope write:entries solo para la vigente · cada rebote queda en el audit log`);
+    res.json({ hardening: true, keys_hashed });
+  });
+
+  // Audit log (§2.4): intentos bloqueados con hardening activo; ?since=<id> incremental.
+  router.get('/audit', (req, res) => {
+    const since = Number.parseInt(req.query.since, 10);
+    res.json({ attempts: lab.listAudit(Number.isInteger(since) ? since : 0) });
   });
 
   return router;
