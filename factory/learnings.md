@@ -17,3 +17,4 @@
 - Intentos: arranque directo (falla por lock), localizar proceso.
 - Resolución: matar el huérfano, smoke con puerto propio, demo renacida después.
 - Lección: verificación funcional siempre con PORT efímero/propio; el server de demo es desechable y se reinicia al final, no se protege durante builds.
+- UPDATE 2026-11-15 (post-V2): L-03 mató la demo del Negocio OTRA VEZ (smoke de S09 compartió data/breachlab.db → lock → demo murió). Fix estructural aplicado: `server.js` acepta `BREACHLAB_DB` (env) para DB propia por proceso — TODO smoke/walkthrough DEBE setear `BREACHLAB_DB` a un tmp propio. Regla fábrica: jamás correr un proceso del repo contra data/breachlab.db salvo la demo.

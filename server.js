@@ -69,7 +69,8 @@ function buildApp(lab, attacker = createAttacker({ lab })) {
 
 if (require.main === module) {
   const port = Number.parseInt(process.env.PORT, 10) || DEFAULT_PORT;
-  const lab = createLab({ file: path.join(__dirname, 'data', 'breachlab.db') });
+  // BREACHLAB_DB: los smokes/walkthroughs usan su propia DB y no pisan la demo (L-03).
+  const lab = createLab({ file: process.env.BREACHLAB_DB || path.join(__dirname, 'data', 'breachlab.db') });
   const attacker = createAttacker({ lab, port }); // PORT fluye a bot y server (ADR D-0003)
   buildApp(lab, attacker).listen(port, HOST, () => {
     console.log(`[breachlab] http://${HOST}:${port} — sandbox local · acto 1 (normal)`);
