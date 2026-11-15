@@ -1,0 +1,69 @@
+# S06 — Postmortem + cierre (N-0004 AC4, MVP/V0) · Evidencia de verificación
+
+Fecha: 2026-11-14/15 · Máquina: fábrica (Windows, Node v24.19.0) · Verificador: factory/dev
+Re-verificado 2026-11-15 pre-commit (misma secuencia, mismos números): node_modules
+borrado → `npm ci` (0 vulnerabilities) → `npm test` 36/36 pass, 0 fail (~19.2 s).
+Evidencia complementaria: `S06-e2e-walkthrough.txt` (5 actos contra server real, con tiempos)
+y `S06-secrets.txt` (gitleaks).
+
+## 1. Instalación LIMPIA + suite completa (NFR-9)
+
+Previo: `Remove-Item -Recurse -Force node_modules` → `npm ci`:
+
+```
+removed node_modules (20 dirs) → npm ci
+30 packages are looking for funding
+found 0 vulnerabilities
+```
+
+`npm test` (node --test, 5 archivos incl. e2e.test.js NUEVO):
+
+```
+ℹ tests 36
+ℹ suites 0
+ℹ pass 36
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ duration_ms 19279.7659
+```
+
+- 5 tests NUEVOS de S06 (test/e2e.test.js, subtests de un solo flujo):
+  acto 1 normal (seed 12, leak legible, key filtrada FUNCIONA) · actos 2→3 ataque+detección
+  (alerta critical >30/10s en ~7.8 s de reloj real, basura real, 100% escrituras exitosas,
+  cooldown) · acto 4 matafuegos (kill 403 directo + 401 key desconocida + feed sin 2xx con
+  429 reales, flags, máscara nueva ≠ filtrada) · acto 5 hardening (audit vacío pre-hardening,
+  cero plaintext en DB, scope solo vigente) + re-ataque (100% rebota 401/403/429, basura
+  congelada, audit fila por intento con key enmascarada/endpoint/motivo, health act 5).
+- Los 31 tests de S01..S05 siguen pasando sin cambios (regresión verde).
+
+Timing por diseño: presupuestos derivados de las constantes importables
+(`DETECTION_MAX_REQUESTS`/`DETECTION_WINDOW_MS` de src/apikey.js, `BOT_INTERVAL_MS` de
+src/attacker.js) — ya eran exportadas; cero cambios de producto para el test.
+
+## 2. Entregables S06 verificados
+
+| Entregable | Verificación |
+|---|---|
+| docs/postmortem.md (EN) | Formato profesional completo: Summary · Impact · Timeline 5 actos (T+ relativos) · Root Cause · What Went Well/Wrong · Rapid Response · Long-term Fixes · Lessons Learned · nota final de simulación (keys 100% falsas). Números reales del lab (D-0004: >30/10s, 4 rps, 401/403/429, sha256, write:entries). Servido por `GET /docs/postmortem.md` → HTTP 200, 7172 bytes. |
+| README.md / README.es.md | Link al postmortem bajo la tabla de actos (EN→EN doc; ES→EN doc marcado). |
+| public/index.html | Sección "Postmortem" con link `/docs/postmortem.md` (servido por server.js línea nueva) — verificado True en el HTML del panel. |
+| CHANGELOG.md | 0.1.0 — 2026-11-14, features por slice S01..S06. Sin URLs inventadas. |
+| LICENSE | MIT, "Copyright (c) 2026 BreachLab contributors" (sin persona inventada). |
+| package.json | versión 0.1.0 YA estaba → no tocada. |
+
+## 3. AC4 de N-0004 (la que cierra el nodo)
+
+"Dado el ciclo completo ejecutado, cuando el visitante abre el postmortem EN, entonces lee
+la cronología con impacto y mitigaciones por fase, sin correr nada adicional" — CUBIERTA:
+docs/postmortem.md se lee desde el repo/GitHub sin correr nada; timeline T+0:00..T+0:15 con
+los 5 actos; Impact cuantificado; mitigaciones por fase (Rapid Response = acto 4 con códigos,
+Long-term Fixes = acto 5). Referenciado desde panel y ambos READMEs.
+
+## Notas
+
+- `npm run scan:secrets` requiere gitleaks en PATH — en esta máquina NO está (L-01);
+  el gate lo corre QA. Verificación local por ruta absoluta en `S06-secrets.txt`.
+- e2e.test.js: deadlock inicial (subtest anidado creado dentro del callback de otro
+  subtest en node:test) → estructura aplanada. Fetch autenticado del acto 1 suma 1 hit
+  al detector → aserción con tolerancia ±1 documentada en el test.

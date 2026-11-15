@@ -43,6 +43,11 @@ function buildApp(lab, attacker = createAttacker({ lab })) {
     res.sendFile(path.join(__dirname, 'repo-sim', 'config.json'));
   });
 
+  // Postmortem servido read-only (S06): el relato EN del incidente, linkeado desde el panel.
+  app.get('/docs/postmortem.md', (_req, res) => {
+    res.sendFile(path.join(__dirname, 'docs', 'postmortem.md'));
+  });
+
   // Panel del defensor (S02): vanilla static, sin build step (plan §2.1). index.html queda en /.
   app.use(express.static(path.join(__dirname, 'public')));
 

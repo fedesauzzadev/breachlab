@@ -1,0 +1,36 @@
+﻿== BreachLab S06 - walkthrough 5 actos (server real npm start, PORT 3471) ==
+== Re-verificación dev 2026-11-15 (pre-commit); corrida original 2026-11-14: mismos números ==
+
+ACTO 1 - normal
+[+ 0.04s] GET /api/health      -> {"status":"ok","db_entries":12,"act":1}
+[+ 0.05s] GET /api/lab/state   -> act=1 db={"legit":12,"garbage":0} storage=plaintext flags all false
+[+ 0.05s] leak artifact        -> key (falsa): sk_breachlab_d...
+[+ 0.05s] GET /api/entries con la key del leak -> HTTP 200 (FUNCIONA: 200)
+
+ACTOS 2-3 - ataque y detección (bot 4 rps real, umbral >30/10s)
+[+ 0.05s] POST /api/lab/attack start
+[+ 7.96s] DETECTED: act=3 tras 8.0s {"legit":12,"garbage":30} blocked=0 feed=201,201,201,201,201,201,201,201,201,201,201,201,201,201,201,201,201,201,201,201
+[+ 7.97s] alert: [critical] 2026-11-15T13:31:47.890Z | Detección: anomalous volume · key sk_b…3a9c · 31 requests en 10 s
+
+ACTO 4 - matafuegos (kill switch + rotación + rate limit)
+[+ 7.97s] kill-switch -> 200
+[+ 7.99s] rotate-key  -> {"new_key_masked":"sk_b…3fa7"}
+[+ 8.02s] rate-limit  -> {"ratelimit":true,"max":10,"window_ms":10000}
+[+ 8.03s] POST directo con la key filtrada -> HTTP 403 (kill switch: acceso muerto)
+[+13.03s] act=4 BASURA CONGELADA=30 legit=12 intactas feed=403,403,403,403,403,403,403,403,403,429,429,429,429,429,429,429,429,429,429,429
+
+ACTO 5 - hardening + re-ataque
+[+13.04s] hardening   -> {"hardening":true,"keys_hashed":2}
+[+13.09s] re-ataque con la MISMA key filtrada
+[+18.98s] feed=429,429,429,429,429,429,429,429,429,429,429,429,429,429,429,429,429,403,403,403 basura=30 (CERO nueva) legit=12 act=5 storage=sha256
+[+18.98s] audit (3+ filas):
+         2026-11-15T13:31:58.386Z POST /api/entries -> 403 (key_disabled) key sk_b…3a9c
+         2026-11-15T13:31:58.652Z POST /api/entries -> 403 (key_disabled) key sk_b…3a9c
+         2026-11-15T13:31:58.891Z POST /api/entries -> 403 (key_disabled) key sk_b…3a9c
+
+CIERRE - postmortem accesible
+[+19.00s] GET /docs/postmortem.md -> HTTP 200 (6874 bytes, EN)
+[+19.00s] panel (/) linkea postmortem: True
+[+19.00s] GET /api/health final -> {"status":"ok","db_entries":42,"act":5}
+
+TOTAL walkthrough: 19s (límite QA <= 5 min: OK)

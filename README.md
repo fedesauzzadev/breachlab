@@ -25,6 +25,8 @@ Open **http://127.0.0.1:3000** — no configuration, no env vars, no build step.
 | **4 · Contained** | You fight back: kill switch, key rotation, rate limit. The feed shows real 403/401/429 responses. |
 | **5 · Hardened** | Keys move to sha256 hashes, scopes get enforced, blocked attempts land in the audit log. Re-attack bounces. |
 
+**Read the full story after the run: [Incident postmortem](docs/postmortem.md)** — timeline, impact, root cause, rapid response and long-term fixes, written as a professional incident report.
+
 ## Security notes (read this)
 
 - **Every key in this repo is fake.** Demo keys use the `sk_breachlab_demo_` prefix and are *FAKE BY DESIGN* — no real third-party secret is ever included. The repo ships a secrets gate (`npm run scan:secrets`) that must report **0 findings**.
