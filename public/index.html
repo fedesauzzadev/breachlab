@@ -26,6 +26,13 @@
   pre { background:#010409; border:1px solid var(--line); border-radius:6px; padding:12px; overflow-x:auto; margin-top:12px; font-size:13px; }
   .warn { color:var(--amber); font-size:12px; margin-top:8px; }
   .conn-lost { color:var(--red); font-size:12px; }
+  .badge.warn { background:rgba(210,153,34,.15); color:var(--amber); }
+  button:disabled { opacity:.45; cursor:not-allowed; }
+  .alert { color:var(--red); border:1px solid var(--red); background:rgba(248,81,73,.08); padding:8px 12px; border-radius:6px; margin-top:12px; font-weight:600; }
+  .feed { margin-top:12px; display:flex; flex-wrap:wrap; gap:6px; }
+  .feed code { padding:1px 7px; border-radius:4px; font-size:12px; }
+  .feed .c2xx { color:var(--green); background:rgba(63,185,80,.12); }
+  .feed .c4xx { color:var(--red); background:rgba(248,81,73,.12); }
   code { font-family:ui-monospace,monospace; }
 </style>
 </head>
@@ -40,6 +47,21 @@
     <div><b id="act">—</b><span>acto (1–5)</span></div>
     <div><b id="entries">—</b><span>registros en la DB</span></div>
   </div>
+</section>
+
+<section>
+  <h2>Simulación de ataque</h2>
+  <p class="warn">El bot interno usa la key filtrada del repo contra <code>POST /api/entries</code>
+     (4 req/s, todo por 127.0.0.1). No se detiene solo.</p>
+  <button id="attack-start">Simular ataque</button>
+  <button id="attack-stop" disabled>Detener ataque</button>
+  <div class="stats">
+    <div><b id="attack-requests">0</b><span>requests anómalos</span></div>
+    <div><b id="garbage">0</b><span>basura en la DB</span></div>
+    <div><b id="legit">—</b><span>registros legítimos</span></div>
+  </div>
+  <p id="alert" class="alert" hidden></p>
+  <div id="feed" class="feed" hidden></div>
 </section>
 
 <section>

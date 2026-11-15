@@ -1,20 +1,36 @@
 'use strict';
-// Panel del defensor (S02): polling 1s a /api/health + timeline incremental (plan §2.1), botón "ver el leak" (AC4).
+// Panel del defensor (S02+S03): polling 1s a /api/lab/state + timeline incremental,
+// control del ataque (AC1/AC4), contadores en vivo (AC2) y alerta roja (AC3).
 (() => {
   const $ = (id) => document.getElementById(id);
   const ACTS = ['', 'normal', 'ataque', 'detectado', 'contenido', 'hardened'];
+  const BADGES = {
+    1: ['ok', 'Operación normal'], 2: ['warn', 'Ataque en curso'], 3: ['down', 'Intrusión detectada'],
+    4: ['down', 'Incidente contenido'], 5: ['ok', 'Sistema endurecido'],
+  };
   let lastEventId = 0;
 
-  // Estado del lab desde /api/health (contrato §2.4; /api/lab/state completo llega en S03).
+  // Estado completo del lab (contrato §2.4): actos, contadores del ataque y de la DB.
   async function pollState() {
     try {
-      const h = await (await fetch('/api/health')).json();
+      const s = await (await fetch('/api/lab/state')).json();
       $('conn').hidden = true;
+      const [cls, label] = BADGES[s.act] || ['down', 'estado ?'];
       const badge = $('state');
-      badge.className = 'badge ' + (h.status === 'ok' ? 'ok' : 'down');
-      badge.textContent = h.status === 'ok' ? 'Operación normal' : 'Lab caído';
-      $('act').textContent = `${h.act} · ${ACTS[h.act] || '?'}`;
-      $('entries').textContent = h.db_entries;
+      badge.className = 'badge ' + cls;
+      badge.textContent = label;
+      $('act').textContent = `${s.act} · ${ACTS[s.act] || '?'}`;
+      $('entries').textContent = s.db.legit + s.db.garbage;
+      $('legit').textContent = s.db.legit;
+      $('garbage').textContent = s.db.garbage;
+      $('attack-requests').textContent = s.attack.requests;
+      $('attack-start').disabled = s.attack.running;
+      $('attack-stop').disabled = !s.attack.running;
+      const feed = $('feed'); // códigos HTTP REALES del bot (base del relato de S04)
+      feed.hidden = s.attack.recent.length === 0;
+      feed.innerHTML = s.attack.recent
+        .map((r) => `<code class="${r.status >= 200 && r.status < 300 ? 'c2xx' : 'c4xx'}">${r.status}</code>`)
+        .join('');
     } catch {
       $('conn').hidden = false; // reintenta en el próximo tick
     }
@@ -31,10 +47,28 @@
           `<span class="sev-${e.severity}">${e.message}</span>`;
         ul.appendChild(li);
         lastEventId = e.id;
+        if (e.kind === 'alert') { // alerta roja visible hasta fin de la sesión (AC3)
+          const banner = $('alert');
+          banner.textContent = `${new Date(e.ts).toLocaleTimeString()} — ${e.message}`;
+          banner.hidden = false;
+        }
       }
       ul.scrollTop = ul.scrollHeight; // lo más reciente visible
     } catch { /* pollState ya reporta la desconexión */ }
   }
+
+  // Control del bot (AC1/AC4): los botones se rehabilitan en el próximo poll.
+  function attack(action) {
+    $('attack-start').disabled = true;
+    $('attack-stop').disabled = true;
+    fetch('/api/lab/attack', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ action }),
+    }).catch(() => {});
+  }
+  $('attack-start').addEventListener('click', () => attack('start'));
+  $('attack-stop').addEventListener('click', () => attack('stop'));
 
   // El leak: la config "versionada" con la key falsa (AC4, FAKE BY DESIGN).
   $('leak-btn').addEventListener('click', async () => {

@@ -6,13 +6,13 @@
 BreachLab: lab interactivo 100% local para porfolio personal — representa un incidente real de API key filtrada (ataque → detección → matafuegos → hardening) y su mitigación. Spec: `factory/spec.md`.
 
 ## Active slice
-S03 "Ataque + detección" (N-0002) — **próximo a construir**. S01 y S02 implementados: S02 (2026-11-14) cerró la cobertura de TODAS las AC de N-0001 (panel defensor ES + timeline polling 1s + botón "ver el leak", READMEs EN/ES, gate gitleaks 0 findings). N-0001 queda `implemented` a la espera de verificación independiente. Evidencia: `brain/evidence/S01-*.txt` y `S02-*.txt`. S03: bot in-process con la key filtrada → src/apikey.js·attacker.js·entries.js·labroutes.js + tests. Plan técnico: `factory/plan.md` (G1 cerrado). Ejecución MVP: S01..S06 (S01..S04 = slice-1 del PO; S05..S06 = slice-2).
+S04 "Matafuegos" (N-0003) — **próximo a construir**. S03 (2026-11-14) implementó N-0002 completo: bot in-process 4 rps con la key del artefacto repo-sim (attacker.js), middleware x-api-key vulnerable + detector >30/10 s con cooldown 15 s (apikey.js), router /api/entries con validación estricta (entries.js), consola /api/lab/* con state/attack (labroutes.js) y panel con contadores en vivo + feed de códigos + alerta roja. 18/18 tests verde, evidencia funcional y de aislamiento en `brain/evidence/S03-attack-detection.txt`. N-0002 queda `implemented` a la espera de verificación independiente. S04: kill switch · rotación · rate limit → src/ratelimit.js + edits en lab/apikey/labroutes/panel + test/firewall.test.js. Plan técnico: `factory/plan.md` (G1 cerrado). Ejecución MVP: S01..S06 (S01..S04 = slice-1 del PO; S05..S06 = slice-2).
 
 ## Nodes
 | ID | Title | Type | Size | Status | Key links |
 |----|-------|------|------|--------|-----------|
 | N-0001 | H-01 Lab base: API vulnerable + panel con timeline en estado normal | feature | M | implemented (S01+S02: TODAS las AC cubiertas; falta verificación independiente) | H-01 · base de N-0002 · `server.js`/`src/lab.js`/`public/*`/READMEs/`.gitleaks.toml` |
-| N-0002 | H-02 Modo ataque: bot con la key filtrada llena la DB | feature | M | planned | H-02 · depende N-0001 |
+| N-0002 | H-02 Modo ataque: bot con la key filtrada llena la DB | feature | M | implemented (S03: TODAS las AC cubiertas + tests 18/18 + evidencia funcional/aislamiento; falta verificación independiente) | H-02 · `src/apikey.js`·`src/attacker.js`·`src/entries.js`·`src/labroutes.js`·`public/panel.js` |
 | N-0003 | H-03 Matafuegos: kill switch, rotación de key, rate limit | feature | M | planned | H-03 · depende N-0002 |
 | N-0004 | H-04 Hardening: keys hasheadas, scopes, audit log, re-ataque rebota + postmortem EN | feature | L | planned | H-04 · depende N-0003 · cierra MVP |
 | N-0005 | H-05 Modo guiado + reinicio del incidente | feature | S | planned | H-05 (V1) · depende N-0004 |

@@ -10,34 +10,31 @@ try {
 const path = require('node:path');
 const express = require('express');
 const { createLab } = require('./src/lab');
+const { createApiKeyAuth } = require('./src/apikey');
+const { createEntriesRouter } = require('./src/entries');
+const { createLabRoutes } = require('./src/labroutes');
+const { createAttacker } = require('./src/attacker');
 
 const HOST = '127.0.0.1'; // aislamiento del sandbox: nunca 0.0.0.0 (ADR D-0003)
 const DEFAULT_PORT = 3000; // único env opt-in: PORT (plan §3)
 
-function buildApp(lab) {
+function buildApp(lab, attacker = createAttacker({ lab })) {
   const app = express();
   app.disable('x-powered-by'); // NFR-4: sin versiones en respuestas
+
+  // Runtime S03 sobre el lab: contadores del ataque + flags de matafuegos (S04 las prende).
+  lab.state.attack = { running: false, requests: 0, blocked: 0, recent: [] };
+  lab.state.flags = { killswitch: false, ratelimit: false, hardening: false, rotated: false };
 
   // Health del panel — sin key (contrato §2.4).
   app.get('/api/health', (_req, res) => {
     res.json({ status: 'ok', db_entries: lab.countEntries(), act: lab.state.act });
   });
 
-  // API víctima — el contrato exige x-api-key. S01: comparación plaintext (el middleware llega en S03).
-  app.get('/api/entries', (req, res) => {
-    const key = req.get('x-api-key');
-    if (!key || !lab.isKeyActive(key)) {
-      return res.status(401).json({ error: 'invalid_api_key' });
-    }
-    const entries = lab.listEntries();
-    res.json({ entries, count: entries.length });
-  });
-
-  // Timeline del defensor (AC3): eventos cronológicos con hora. ?since=<id> incremental.
-  app.get('/api/lab/timeline', (req, res) => {
-    const since = Number.parseInt(req.query.since, 10);
-    res.json({ events: lab.listEvents(Number.isInteger(since) ? since : 0) });
-  });
+  // API víctima detrás del middleware x-api-key (cadena §2.1: apikey → contador → handler).
+  app.use('/api/entries', createApiKeyAuth(lab), createEntriesRouter(lab));
+  // Consola del defensor (state, timeline, attack).
+  app.use('/api/lab', createLabRoutes(lab, attacker));
 
   // El leak servido read-only: la "config versionada" con la key falsa (AC4, ADR D-0003 §6).
   app.get('/leak/config.json', (_req, res) => {
@@ -49,8 +46,12 @@ function buildApp(lab) {
 
   // 404 JSON sin internals (NFR-4: sin rutas/stack/versiones en cuerpos de error).
   app.use((_req, res) => res.status(404).json({ error: 'not_found' }));
-  // Handler central (plan §3): 500 sin internals.
+  // Handler central (plan §3): bodies malformados (parse/size/charset de body-parser)
+  // → 400 invalid_request sin internals; todo lo demás → 500 sin internals.
   app.use((err, _req, res, _next) => {
+    if (err && [400, 413, 415].includes(err.status)) {
+      return res.status(400).json({ error: 'invalid_request', details: 'body JSON malformado o demasiado grande' });
+    }
     console.error('[breachlab] error no manejado:', err.message);
     res.status(500).json({ error: 'internal_error' });
   });
@@ -61,7 +62,8 @@ function buildApp(lab) {
 if (require.main === module) {
   const port = Number.parseInt(process.env.PORT, 10) || DEFAULT_PORT;
   const lab = createLab({ file: path.join(__dirname, 'data', 'breachlab.db') });
-  buildApp(lab).listen(port, HOST, () => {
+  const attacker = createAttacker({ lab, port }); // PORT fluye a bot y server (ADR D-0003)
+  buildApp(lab, attacker).listen(port, HOST, () => {
     console.log(`[breachlab] http://${HOST}:${port} — sandbox local · acto 1 (normal)`);
   });
 }

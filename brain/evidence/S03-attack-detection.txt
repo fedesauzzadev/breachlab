@@ -1,0 +1,74 @@
+# S03 — Modo ataque + detección (cierra N-0002) · Evidencia de verificación
+
+Fecha: 2026-11-14 · Máquina: fábrica (Windows, Node v24) · Verificador: factory/dev
+
+## 1. Instalación limpia + suite completa
+
+Comando: `npm ci` ; `npm test`
+
+```
+found 0 vulnerabilities
+ℹ tests 18
+ℹ suites 0
+ℹ pass 18
+ℹ fail 0
+ℹ duration_ms 6327.4559
+```
+
+- 9 tests NUEVOS de S03 (test/attack.test.js): 401 sin key · 400 validación estricta
+  (campos extra, rangos, tipos, JSON malformado) · propiedad con semilla fija (201 sii
+  title 1..80 y body 1..280, 40 casos LCG) · 201 fuera de ataque con kind=legit ·
+  AC1 (start → 202, acto 2, requests+basura reales, payload SPAM-<n>) · AC3 (umbral
+  >30/10s → alerta critical con hora/key enmascarada/motivo, cooldown 15s sin segunda
+  alerta, acto 3 en state y health) · AC4 (stop → basura persistida en SQLite, sin
+  crecimiento) · contrato /api/lab/state completo · action inválida → 400.
+- Los 9 tests de S01/S02 siguen pasando (sin cambios).
+
+## 2. Funcional con servidor real (`node server.js`, 127.0.0.1:3000)
+
+| Paso | Comando | Observado |
+|---|---|---|
+| baseline | GET /api/health | `{"status":"ok","db_entries":12,"act":1}` |
+| baseline | GET /api/lab/state | act 1 · attack todo 0 · db {legit:12,garbage:0} · keys storage "plaintext" · thresholds 30/10000/15000/250 |
+| ataque | POST /api/lab/attack {"action":"start"} | `{"running":true}` (202) |
+| t+4s | GET /api/lab/state | act 3 · attack.requests 35 = db.garbage 35 · feed: 20 códigos 201 reales |
+| detección | GET /api/lab/timeline?since=6 | `[{id:7, kind:"alert", severity:"critical", message:"Detección: anomalous volume · key sk_b…3a9c · 31 requests en 10 s"}]` — hora en ts, key enmascarada, motivo fijo, dispara exacto en el hit 31 |
+| paro | POST /api/lab/attack {"action":"stop"} | `{"running":false}` (202) |
+| degradado | GET /api/lab/state (1s tras stop) | act 3 · running false · garbage 71 persistida · legit 12 intactas · blocked 0 |
+
+## 3. Aislamiento (NFR-3)
+
+grep de clientes HTTP en código de proceso (`src/*.js`, `server.js`):
+
+```
+attacker.js:43: const res = await fetch(`${att.baseUrl}/entries`, {
+attacker.js:10: const HOST = '127.0.0.1';   // constante del sandbox
+```
+
+Único `fetch` del proceso = el bot, host loopback constante (panel.js usa fetch del
+navegador con URLs relativas — no es IO del proceso).
+
+netstat DURANTE ataque activo:
+
+```
+TCP  127.0.0.1:3000  0.0.0.0:0            LISTENING     17248
+TCP  127.0.0.1:3000  127.0.0.1:53724      ESTABLISHED   17248
+TCP  127.0.0.1:3000  127.0.0.1:53725      ESTABLISHED   17248
+TCP  127.0.0.1:53710 127.0.0.1:3000       TIME_WAIT     0
+TCP  127.0.0.1:53724 127.0.0.1:3000       ESTABLISHED   16992
+TCP  127.0.0.1:53725 127.0.0.1:3000       ESTABLISHED   17248
+```
+
+Listener solo en 127.0.0.1:3000; todas las conexiones loopback↔loopback; 0 sockets externos.
+
+## Notas de implementación
+
+- Números FIJOS según ADR D-0004 (bot 250ms/4rps, >30 req/10s móvil, cooldown 15s,
+  payload SPAM-<n>) — constantes en src/apikey.js y src/attacker.js, expuestas por
+  /api/lab/state → thresholds.
+- kind lo decide el flujo del lab: POST autenticado durante ataque → garbage; fuera →
+  legit (mínimo consistente con §2.1/§2.5; sin complejidad extra).
+- lab.js quedó INTACTO (límite 8 archivos): runtime de S03 montado sobre lab.state
+  desde buildApp; routers usan lab.db directo (patrón router → lab/db del plan §2.3).
+- Detección vive en el middleware auth (cadena §2.1: apikey → contador → handler):
+  cuenta TODA request autenticada por key, no solo las del bot.
