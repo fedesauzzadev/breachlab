@@ -3,6 +3,30 @@
 Format based on [Keep a Changelog](https://keepachangelog.com/); versioning follows
 [SemVer](https://semver.org/).
 
+## [0.3.1] — 2026-11-15
+Debt closure: five minor QA findings closed (L-6, L-8, L-9, L-10, L-11 — ADR D-0007).
+
+### Changed
+- **Anomaly detection counts writes only (L-9).** The sliding-window detector no longer
+  counts authenticated `GET`s: a deliberate flood of legitimate reads can no longer
+  fire a false alert or degrade a hardened lab from act 5 back to act 3. Reads still
+  authenticate exactly as before — they just don't feed the >30-writes/10 s window.
+- **Panel recovers from external resets (L-8).** `/api/lab/state` now exposes the lab
+  `epoch`; the panel compares it between polls and automatically re-arms its
+  timeline/audit cursors when a reset or scenario switch happens outside its own click
+  (curl, another tab) — no more frozen feed until the old cursor is surpassed.
+- **Evidence export escapes table pipes (L-10).** Cells carrying variable data (audit
+  key mask, endpoint, reason; timeline message) escape `|` as `\|`: a loopback
+  adversary can no longer break the markdown table structure of the exported file.
+- **Concurrent scenario switches answer honestly (L-11).** `POST /api/lab/scenarios/:id`
+  responds with the scenario that is actually active after the re-seed, not the one it
+  was asked for — two simultaneous switches both see the winner.
+
+### Fixed
+- **Re-encoded brain nodes N-0001..N-0004 (L-6).** The double-encoded mojibake
+  (UTF-8 read as Windows-1252) was reverted byte-exact; the kit's brain validator now
+  parses all node frontmatter (previously "acceptance_criteria empty" on four nodes).
+
 ## [0.3.0] — 2026-11-15
 V2: from a single demo to a series of labs — plus shareable evidence.
 

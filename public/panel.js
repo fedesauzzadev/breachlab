@@ -9,6 +9,7 @@
     4: ['down', 'Incidente contenido'], 5: ['ok', 'Sistema endurecido'],
   };
   let lastEventId = 0;
+  let lastEpoch = null;    // L-8: epoch del último /state — cambia en cada reset/switch
   let lastState = null;   // S08: último /api/lab/state (render del modo guiado)
   let guidedOn = false;   // S08: el modo guiado es estado del panel, no del lab
 
@@ -25,6 +26,11 @@
     try {
       const s = await (await fetch('/api/lab/state')).json();
       lastState = s;
+      // L-8 (QA V1): un reset/cambio de vector EXTERNO (curl, otra pestaña) cambia la
+      // epoch — el panel rearma solo los cursores (los ids vuelven a 1) sin esperar
+      // su propio click.
+      if (lastEpoch !== null && lastEpoch !== s.epoch) clearIncident();
+      lastEpoch = s.epoch;
       $('conn').hidden = true;
       const [cls, label] = BADGES[s.act] || ['down', 'estado ?'];
       const badge = $('state');

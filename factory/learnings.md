@@ -18,3 +18,9 @@
 - Resolución: matar el huérfano, smoke con puerto propio, demo renacida después.
 - Lección: verificación funcional siempre con PORT efímero/propio; el server de demo es desechable y se reinicia al final, no se protege durante builds.
 - UPDATE 2026-11-15 (post-V2): L-03 mató la demo del Negocio OTRA VEZ (smoke de S09 compartió data/breachlab.db → lock → demo murió). Fix estructural aplicado: `server.js` acepta `BREACHLAB_DB` (env) para DB propia por proceso — TODO smoke/walkthrough DEBE setear `BREACHLAB_DB` a un tmp propio. Regla fábrica: jamás correr un proceso del repo contra data/breachlab.db salvo la demo.
+
+## L-04 — git stash/pop con autocrlf=true convierte LF→CRLF y rompe el validador del brain
+- Qué pasó: durante debt-closure v0.3.1 se corrió `git stash` + `stash pop` para validar el estado de HEAD; el pop reescribió los archivos modificados con CRLF (autocrlf=true). El frontmatter de brain/nodes/*.md con `\r` hace que validate-brain.mjs reporte "acceptance_criteria empty" en nodos sanos.
+- Intentos: re-correr el validador (mismo error), inspeccionar bytes (CR count > 0 confirmó la conversión).
+- Resolución: normalizar los archivos afectados de vuelta a LF con un script node antes de re-validar. El commit no se ve afectado (autocrlf normaliza a LF en el blob).
+- Lección: en esta máquina, jamás usar stash para comparar contra HEAD; usar `git show HEAD:<path>` a un tmp. Si un archivo del brain falla el validador con "empty", chequear CR (\r) antes que el contenido.

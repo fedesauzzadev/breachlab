@@ -84,14 +84,16 @@ Criticos: 0. Mayores: 0.
 
 MENORES (nuevos):
 - L-10 - Export markdown inyectable via celdas del audit: audit.endpoint lleva el originalUrl crudo (query incluida) y key_masked la mascara de la key presentada; ambos entran sin escapar a la tabla del export y un "|" parte la fila. Repro completo en QA-v2-fuzz.txt P4 (fila rota capturada). Requiere cliente loopback adversarial; los mensajes del timeline NO son inyectables. Fix: escape de "|" en las celdas del export.
+  **RESUELTO 2026-11-15, v0.3.1 debt-closure (ADR D-0007)**: las celdas con datos variables (key_masked, endpoint, reason, message) escapan `|` como `\|` en GET /api/lab/export. Repro P4 re-corrido en walkthrough real: fila `| POST | /api/entries?x=\|FAKE\|COL\|CELDA\| | 403 | insufficient_scope |` intacta, 0 filas rotas de 13 (brain/evidence/debt-closure-walkthrough.txt). Test de inyecciÃ³n + integridad de tabla en test/debt-closure.test.js.
 - L-11 - Carrera de switches: la respuesta 200 del switch perdedor nombra un vector distinto al activo (estado interno consistente 6/6). Solo alcanzable con clientes concurrentes programaticos (el panel serializa). Fix: responder con scenarioId post-fullReset.
+  **RESUELTO 2026-11-15, v0.3.1 debt-closure (ADR D-0007)**: la ruta responde `lab.state.scenarioId` leido DESPUES del fullReset. Test de carrera con Promise.all x3 pares en test/debt-closure.test.js: ambas respuestas = ganador efectivo, seed/key del ganador, nunca un nombre huÃ©rfano.
 
 Abiertos de V0/V1 (re-verificados hoy):
 - L-4 - SIGUE (documental): precedencia rateLimit->apikey; re-confirmado en vivo hoy (re-ataque con rate-limit: 10 de 20 rebotes auditados, los 429 no auditan).
 - L-5 - SIGUE: gitleaks fuera de PATH en esta maquina; scan:secrets falla, ruta absoluta exit 0 / 0 findings.
-- L-6 - SIGUE (cosmetico): mojibake de display en consola PowerShell; archivos UTF-8 correctos (verificado CHANGELOG byte a byte).
-- L-8 - SIGUE y se AMPLIA (cosmetico->igual severidad): el cambio de vector TAMBIEN rearma ids a 1; el panel solo rearma cursores en su propio click (reset-btn / scenario-select). Un switch o reset disparado por curl u otra pestana congela el timeline/audit de la pestana que no disparo hasta superar el cursor viejo. Sin fix de epoch en /state todavia.
-- L-9 - SIGUE (pre-existing S03, fuera del delta): recordHit degrada act 5->3 ante flood manual de GETs validos (codigo de apikey.js sin cambio en el delta).
+- L-6 - **RESUELTO 2026-11-15, v0.3.1 debt-closure (ADR D-0007)**: re-encode byte-exacto de N-0001..N-0004 (UTF-8 leido como Windows-1252); validador del kit VALID (el mojibake rompia el frontmatter de 4 nodos).
+- L-8 - **RESUELTO 2026-11-15, v0.3.1 debt-closure (ADR D-0007)**: `epoch` expuesta en /api/lab/state; panel.js rearma cursores de timeline/audit al verla cambiar entre polls (reset externo ya no congela la pestana). Lado servidor testeado; wiring del panel verificado en browser por el orquestador.
+- L-9 - **RESUELTO 2026-11-15, v0.3.1 debt-closure (ADR D-0007)**: decision de producto (D-0007) â€” el detector cuenta SOLO escrituras (POST); flood de 40 GETs legÃ­timos en hardening: 40Ã—200, act queda 5, 0 alertas (walkthrough real). Tests nuevos + aceleradores GET migrados a POST.
 
 ## Veredicto por nodo
 

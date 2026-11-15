@@ -1,0 +1,14 @@
+[server] [breachlab] http://127.0.0.1:4591 ÔÇö sandbox local ┬À acto 1 (normal)
+== DB propia: C:\Users\hp\AppData\Local\Temp\breachlab-debt-walk-aQbe9M\walkthrough.db
+
+[L-9] hardening ON ÔåÆ act = 5
+[L-9] 40 GETs autenticados ÔåÆ 40├ù200 ┬À act = 5 (esperado 5) ┬À alertas = 0 (esperado 0)
+
+[L-10] POST con pipes: query/key ÔåÆ 403/401 (auditados con hardening)
+[L-10] fila del audit en el export:
+    | 1 | 2026-11-15T19:49:19.398Z | sk_bÔÇª3a9c | POST | /api/entries?x=\|FAKE\|COL\|CELDA\| | 403 | insufficient_scope |
+[L-10] filas de tabla: 13 ┬À filas rotas (pipes Ôëá 6/8): 0 (esperado 0)
+
+[L-11] Promise.all switch ÔåÆ respuestas: frontend-bundle / frontend-bundle ┬À ganador efectivo: frontend-bundle
+
+WALKTHROUGH OK ÔÇö L-9, L-10, L-11 verificados en server real con DB propia.

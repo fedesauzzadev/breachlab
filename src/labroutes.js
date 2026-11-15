@@ -35,6 +35,7 @@ function createLabRoutes(lab, attacker, rateLimiter, auth = null) {
     const sc = SCENARIOS[lab.state.scenarioId];
     res.json({
       act: lab.state.act,
+      epoch: lab.state.epoch, // L-8 (QA V1): el panel detecta resets externos comparando epoch
       attack: a,
       db: counts,
       flags: f,
@@ -183,7 +184,9 @@ function createLabRoutes(lab, attacker, rateLimiter, auth = null) {
     }
     lab.useScenario(req.params.id); // antes del reset: el seed siembra la key nueva
     await fullReset();
-    res.json({ scenario: req.params.id, reset: true });
+    // L-11 (QA V2): con switches concurrentes el perdedor respondería el id que PIDIÓ,
+    // no el activo — se responde el scenarioId EFECTIVO post-reset (el estado manda).
+    res.json({ scenario: lab.state.scenarioId, reset: true });
   });
 
   // S08 (N-0006) escenario 2: key auténtica y activa pero SIN scope de escritura — el
@@ -230,6 +233,9 @@ function createLabRoutes(lab, attacker, rateLimiter, auth = null) {
     const pm = readFileSync(path.join(__dirname, '..', 'docs', 'postmortem.md'), 'utf8');
     const summary = (pm.match(/^## Summary\s*\n([\s\S]*?)(?=\n^## )/m) || [])[1] || '';
     const now = new Date().toISOString();
+    // L-10 (QA V2): las celdas con datos variables se escapan — un "|" crudo en la
+    // query o en la máscara presentada parte la fila de la tabla (markdown).
+    const esc = (v) => String(v).replaceAll('|', '\\|');
     const lines = [
       '# BreachLab — Evidencia del incidente', '',
       `> Exportado: ${now} · Vector de filtración: ${sc.name} · Acto: ${s.act} de 5`,
@@ -241,11 +247,11 @@ function createLabRoutes(lab, attacker, rateLimiter, auth = null) {
       `- Keys: almacenamiento ${f.hardening ? 'sha256' : 'plaintext'} · filtrada ${maskKey(sc.key)} · vigente ${(f.hardening ? s.currentMasked : (current && current.key_plain ? maskKey(current.key_plain) : '—'))}`, '',
       `## Timeline (${events.length} eventos)`, '',
       '| # | Hora (UTC) | Tipo | Severidad | Mensaje |', '|---|---|---|---|---|',
-      ...events.map((e) => `| ${e.id} | ${e.ts} | ${e.kind} | ${e.severity} | ${e.message} |`), '',
+      ...events.map((e) => `| ${e.id} | ${e.ts} | ${e.kind} | ${e.severity} | ${esc(e.message)} |`), '',
       `## Audit log (${attempts.length} intentos bloqueados)`, '',
       ...(attempts.length
         ? ['| # | Hora (UTC) | Key | Método | Endpoint | Status | Motivo |', '|---|---|---|---|---|---|---|',
-          ...attempts.map((x) => `| ${x.id} | ${x.ts} | ${x.key_masked} | ${x.method} | ${x.endpoint} | ${x.status} | ${x.reason} |`)]
+          ...attempts.map((x) => `| ${x.id} | ${x.ts} | ${esc(x.key_masked)} | ${x.method} | ${esc(x.endpoint)} | ${x.status} | ${esc(x.reason)} |`)]
         : ['Sin intentos bloqueados registrados (hardening sin activar, o nada rebotó aún).']), '',
       '## Resumen del postmortem', '',
       summary.trim(), '',

@@ -42,10 +42,12 @@ async function withServer(t) {
 }test('AC1 kill switch: 403 key_disabled, basura congela, blocked crece, evento con hora, acto 3→4', async (t) => {
   const { base, post, fw, state, timeline, until } = await withServer(t);
   await post('/api/lab/attack', { action: 'start' });
-  for (let i = 0; i < 32; i++) await fetch(`${base}/api/entries`, { headers: { 'x-api-key': KEY } }); // umbral (patrón S03)
+  // Umbral acelerado con 32 ESCRITURAS de la key (L-9/D-0007: el detector solo cuenta
+  // POST — los GET ya no inflan la ventana).
+  for (let i = 0; i < 32; i++) await post('/api/entries', { title: `AC1-${i}`, body: `AC1-${i}` });
   await until(async () => ((await timeline()).some((e) => e.kind === 'alert') ? 1 : null), 5000, 'alerta');
-  // Los 32 fetch de arriba son GETs (solo inflan el detector): la basura llega con el
-  // primer POST del bot — en runners lentos puede llegar después de la alerta. Poll.
+  // Los 32 POST de arriba ya escriben basura por sí mismos (ataque corriendo); el bot
+  // sigue sumando. En runners lentos igual conviene pollear antes del switch.
   await until(async () => (((await state()).db.garbage >= 1) ? 1 : null), 5000, 'garbage >= 1 (primer POST del bot)');
 
   const res = await fw('kill-switch', { enabled: true });

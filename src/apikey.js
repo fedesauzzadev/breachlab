@@ -60,7 +60,9 @@ function createApiKeyAuth(lab) {
       return reject(req, res, key, 403, 'insufficient_scope'); // §2.5: escribir exige scope
     }
     req.authEpoch = lab.state.epoch; // M-3 (QA V1): la auth vale para la epoch vigente al llegar headers
-    recordHit(key);
+    // L-9 (QA V1, D-0007): el detector cuenta SOLO intentos de escritura (POST) —
+    // un flood de GETs legítimos no dispara alerta ni degrada el acto (5→3).
+    if (req.method !== 'GET') recordHit(key);
     next();
   };
   // S08 reset (N-0005): el detector vuelve a cero — sin hits ni cooldown heredados del

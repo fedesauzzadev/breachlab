@@ -123,9 +123,13 @@ test('AC1: attack start → 202, acto 2, bot dispara requests reales y escribe b
 test('AC3: umbral >30/10 s → alerta critical con hora, key enmascarada y motivo; cooldown 15 s', async (t) => {
   const { post, base, state, timeline } = await withServer(t);
   await post('/api/lab/attack', { action: 'start' });
-  // Acelera el cruce del umbral: 32 requests autenticados de la MISMA key (el bot suma el resto).
+  // Acelera el cruce del umbral: 32 ESCRITURAS de la MISMA key (el bot suma el resto).
+  // L-9 (D-0007): el detector solo cuenta intentos de escritura (POST) — los GET no.
   for (let i = 0; i < 32; i++) {
-    await fetch(`${base}/api/entries`, { headers: { 'x-api-key': leak.api_key } });
+    await fetch(`${base}/api/entries`, {
+      method: 'POST', headers: { 'content-type': 'application/json', 'x-api-key': leak.api_key },
+      body: JSON.stringify({ title: `AC3-${i}`, body: `AC3-${i}` }),
+    });
   }
   const alert = await until(async () => (await timeline()).find((e) => e.kind === 'alert') || null,
     5000, 'evento alert');
@@ -138,7 +142,10 @@ test('AC3: umbral >30/10 s → alerta critical con hora, key enmascarada y motiv
   assert.equal((await (await fetch(`${base}/api/health`)).json()).act, 3);
   // Cooldown: otra ráfaga inmediata NO genera segunda alerta (riesgo T4)
   for (let i = 0; i < 32; i++) {
-    await fetch(`${base}/api/entries`, { headers: { 'x-api-key': leak.api_key } });
+    await fetch(`${base}/api/entries`, {
+      method: 'POST', headers: { 'content-type': 'application/json', 'x-api-key': leak.api_key },
+      body: JSON.stringify({ title: `CD-${i}`, body: `CD-${i}` }),
+    });
   }
   await sleep(300);
   assert.equal((await timeline()).filter((e) => e.kind === 'alert').length, 1);

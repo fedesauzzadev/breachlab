@@ -1,0 +1,73 @@
+
+> breachlab@0.3.0 test
+> node --test
+
+Ô£ö 401: POST /api/entries sin key o key mala ÔåÆ invalid_api_key (274.8821ms)
+Ô£ö 400: validaci├│n estricta ÔÇö campos extra, fuera de rango, tipos, JSON malformado (338.6582ms)
+Ô£ö Propiedad (semilla fija): POST es 201 sii title 1..80 y body 1..280 (667.8866ms)
+Ô£ö 201: POST v├ílido sin ataque ÔåÆ {id}, kind legit, visible en GET (101.8303ms)
+Ô£ö AC1: attack start ÔåÆ 202, acto 2, bot dispara requests reales y escribe basura (977.7041ms)
+Ô£ö AC3: umbral >30/10 s ÔåÆ alerta critical con hora, key enmascarada y motivo; cooldown 15 s (1482.3467ms)
+Ô£ö AC4: stop ÔåÆ bot se detiene y la basura queda persistida en la DB (estado degradado) (2039.7921ms)
+Ô£ö Contrato ┬º2.4: /api/lab/state expone act, attack, db, flags, keys y thresholds (109.9837ms)
+Ô£ö /api/lab/attack con action inv├ílida ÔåÆ 400 invalid_request (135.3422ms)
+Ô£ö L-9: el detector sigue disparando con escrituras (35 POST ÔåÆ alerta + acto 3) (816.661ms)
+Ô£ö L-9: flood de 40 GETs leg├¡timos en hardening NO degrada el acto ni dispara alerta (627.9989ms)
+Ô£ö L-10: el export escapa "|" en las celdas ÔÇö la tabla no se rompe con pipes inyectados (152.2092ms)
+Ô£ö L-11: switches concurrentes ÔÇö ambas respuestas nombran el vector EFECTIVO (2048.2449ms)
+Ô£ö L-8 (servidor): /state expone epoch y cada reset/switch la incrementa (1116.5629ms)
+ÔûÂ the full incident in 5 acts (e2e regression)
+  Ô£ö act 1 ÔÇö normal: seed intact, leak readable, leaked key WORKS (122.3401ms)
+  Ô£ö acts 2ÔåÆ3 ÔÇö attack: garbage grows, then detection (>30/10 s ÔåÆ critical alert) (8080.1324ms)
+  Ô£ö act 4 ÔÇö matafuegos: kill switch 403, rotation, rate limit 429 ÔÇö garbage freezes (5137.7531ms)
+  Ô£ö act 5 ÔÇö hardening + re-attack: bounces audited, 0 new garbage, attacker gives up (5319.9ms)
+Ô£ö the full incident in 5 acts (e2e regression) (18862.6294ms)
+Ô£ö AC1 kill switch: 403 key_disabled, basura congela, blocked crece, evento con hora, acto 3ÔåÆ4 (1439.2745ms)
+Ô£ö AC2 rotaci├│n: key vieja ÔåÆ 401, nueva leg├¡tima (solo m├íscara en respuestas), bot rebota 401 (1193.7248ms)
+Ô£ö AC3+NFR-5 rate limit default 10/10s: 25 en r├ífaga ÔåÆ EXACTAMENTE 10├ù2xx y 15├ù429 con Retry-After (499.9496ms)
+Ô£ö AC3 params custom + bot estrangulado: 429 domina el feed, throughput acotado al l├¡mite (1633.1409ms)
+Ô£ö Combinados en cualquier orden: kill switch sobre la key filtrada tras rotar ÔåÆ 403; flags ├¡ntegros (168.2606ms)
+Ô£ö Validaci├│n 400 en los tres endpoints (frontera ┬º2.4) y bordes de rango aceptados (336.5331ms)
+Ô£ö FIX-1 escenario 2: r├ífaga finita ÔÇö exactamente 10, se frena solo, evento de cierre, 0 escrituras (3669.7986ms)
+ÔûÂ FIX-2 rendici├│n: 20 rebotes consecutivos frenan al bot; los 201 nunca (racha resetea con 2xx)
+  Ô£ö ataque exitoso: >20 requests con 201 y el bot sigue corriendo (AC1 N-0002) (5778.8055ms)
+  Ô£ö kill switch ÔåÆ todo rebota ÔåÆ rendici├│n con evento de timeline (5099.9566ms)
+Ô£ö FIX-2 rendici├│n: 20 rebotes consecutivos frenan al bot; los 201 nunca (racha resetea con 2xx) (11011.1888ms)
+Ô£ö AC1 hardening: DB pasa a sha256 (plain NULL en todas las filas), scope solo para la vigente, la leg├¡tima sigue escribiendo (348.3333ms)
+Ô£ö AC2 sin rotaci├│n: la key filtrada (a├║n active) hace POST ÔåÆ 403 insufficient_scope; GET sigue OK; audit con la fila (190.4715ms)
+Ô£ö AC2+AC5 re-ataque tras rotate+hardening: bot con la key filtrada ÔåÆ 100% rebota 401, 0 basura nueva, audit fila por intento (1063.7601ms)
+Ô£ö AC3 tabla audit SOLO con hardening activo: rebotes previos (401/403) no dejan rastro; con hardening s├¡ (197.6226ms)
+Ô£ö AC3 GET /api/lab/audit: ids ascendentes, fila sin key presentada con m├íscara ÔÇö, ?since= incremental (135.897ms)
+Ô£ö rotar con hardening activo: la nueva key nace hasheada con scope y la DB sigue sin texto plano (149.9386ms)
+Ô£ö validaci├│n 400 en POST /api/lab/hardening (frontera ┬º2.4) (168.2301ms)
+Ô£ö AC5: servidor ef├¡mero bindeado EXCLUSIVAMENTE a 127.0.0.1 (193.1656ms)
+Ô£ö AC2: /api/health sin key ÔåÆ ok, seed de 12, acto 1 (261.5718ms)
+Ô£ö AC2: /api/entries con la key DEL LEAK ÔåÆ 12 legit, 0 garbage (118.4315ms)
+Ô£ö Contrato ┬º2.4: /api/entries sin key o con key mala ÔåÆ 401 invalid_api_key (126.2916ms)
+Ô£ö AC3: timeline con eventos normales cronol├│gicos y CERO de seguridad (99.3792ms)
+[breachlab] DB corrupta, recreandoÔÇª (file is not a database)
+Ô£ö AC4: /leak/config.json sirve el artefacto read-only con la key falsa (112.3881ms)
+Ô£ö Invariante: seed determinista entre corridas (semilla fija) (169.5322ms)
+Ô£ö NFR-10/M-2: DB corrupta al arranque ÔåÆ se recrea y re-seedea (sin crash) (86.7822ms)
+Ô£ö NFR-4: ruta desconocida ÔåÆ 404 JSON sin internals (90.1953ms)
+Ô£ö S02/AC1+AC4: panel static ÔÇö / sirve HTML con t├¡tulo, /panel.js sirve JS (96.5461ms)
+ÔûÂ N-0005 hitos del modo guiado avanzan con el incidente y el reset restaura el acto 1 sin reiniciar el proceso
+  Ô£ö hitos: ataque ÔåÆ detecci├│n ÔåÆ matafuegos ÔåÆ hardening ÔåÆ re-ataque rebote (8585.7946ms)
+  Ô£ö reset: seed restaurado, timeline/audit limpios, flags en cero ÔÇö proceso vivo (501.7903ms)
+  Ô£ö la demo es re-jugable: el ataque vuelve a escribir basura con la key original (364.0026ms)
+Ô£ö N-0005 hitos del modo guiado avanzan con el incidente y el reset restaura el acto 1 sin reiniciar el proceso (9657.5011ms)
+Ô£ö N-0006 escenario 2: key v├ílida sin scope ÔÇö POST 403 insufficient_scope auditado, GET 200, DB limpia (1083.5878ms)
+Ô£ö M-3 TOCTOU del reset: POST autenticado pre-reset con body goteado rebota y no ensucia el seed (829.9114ms)
+Ô£ö N-0007 AC1: la serie es elegible ÔÇö cat├ílogo de 3 vectores con evidencia y origen propios (263.8415ms)
+Ô£ö N-0007 AC2: vector server-log ÔÇö ciclo completo con su key, su evidencia y su narraci├│n (9996.8003ms)
+Ô£ö N-0007 AC2: vector frontend-bundle ÔÇö ciclo completo con su key, su evidencia y su narraci├│n (10000.1007ms)
+Ô£ö N-0007 base intacta: repo-config sin narraci├│n extra y vuelta limpia desde otro vector (1000.1145ms)
+Ô£ö N-0008: export de evidencia ÔÇö markdown attachment con timeline + audit + resumen del postmortem (9024.5922ms)
+Ôä╣ tests 57
+Ôä╣ suites 0
+Ôä╣ pass 57
+Ôä╣ fail 0
+Ôä╣ cancelled 0
+Ôä╣ skipped 0
+Ôä╣ todo 0
+Ôä╣ duration_ms 24118.916
