@@ -34,6 +34,11 @@ Job test: ubuntu-latest, setup-node@v5 con `node-version: 24` + `cache: npm` (pa
 presente), pasos `npm ci` → `npm test` → `npm run test:coverage`. Sin matrix (solo 24, engines
 lo exige), sin secrets propios.
 
+**Rama renombrada `master` → `main`** (post-commit 660255a): el workflow filtra
+`on.push.branches: [main]` (global al workflow) y la rama histórica era `master` → sin renombrar,
+el primer push NO dispararía ningún job. Renombrado local reversible, sin push. El repo se
+creará con default `main` (estándar GitHub/portfolio).
+
 ## 2. gh auth status
 
 ```
