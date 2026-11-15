@@ -1,6 +1,6 @@
 'use strict';
 // Núcleo del lab (plan §2.3): node:sqlite — schema, seed fijo y estado runtime. Números: ADR D-0004.
-const { mkdirSync, readFileSync } = require('node:fs');
+const { mkdirSync, readFileSync, rmSync } = require('node:fs');
 const path = require('node:path');
 const { createHash, randomBytes } = require('node:crypto');
 const { DatabaseSync } = require('node:sqlite');
@@ -39,13 +39,8 @@ function sha256Hex(key) {
   return createHash('sha256').update(key).digest('hex');
 }
 
-function createLab({ file } = {}) {
-  const dbFile = file || path.join(__dirname, '..', 'data', 'breachlab.db');
-  mkdirSync(path.dirname(dbFile), { recursive: true });
-  const db = new DatabaseSync(dbFile);
-
-  // Re-seed en cada arranque: no hay estado que preservar (spec, supuesto #3).
-  db.exec(`
+// Re-seed en cada arranque: no hay estado que preservar (spec, supuesto #3).
+const SCHEMA = `
     DROP TABLE IF EXISTS entries;
     DROP TABLE IF EXISTS events;
     DROP TABLE IF EXISTS api_keys;
@@ -73,7 +68,29 @@ function createLab({ file } = {}) {
       ts TEXT NOT NULL, key_masked TEXT NOT NULL, method TEXT NOT NULL,
       endpoint TEXT NOT NULL, status INTEGER NOT NULL, reason TEXT NOT NULL
     );
-  `);
+`;
+
+// M-2 (NFR-10): DB corrupta al arranque → log accionable + borrar + re-seed, no stack crudo.
+function openDb(dbFile) {
+  let db;
+  try {
+    db = new DatabaseSync(dbFile);
+    db.exec(SCHEMA);
+    return db;
+  } catch (err) {
+    if (db) db.close(); // Windows: liberar el handle antes de borrar el archivo
+    console.error(`[breachlab] DB corrupta, recreando… (${err.message})`);
+    rmSync(dbFile);
+    db = new DatabaseSync(dbFile);
+    db.exec(SCHEMA);
+    return db;
+  }
+}
+
+function createLab({ file } = {}) {
+  const dbFile = file || path.join(__dirname, '..', 'data', 'breachlab.db');
+  mkdirSync(path.dirname(dbFile), { recursive: true });
+  const db = openDb(dbFile);
 
   const base = Date.now();
   const insEntry = db.prepare(

@@ -9,6 +9,7 @@
   "scripts": {
     "start": "node server.js",
     "test": "node --test",
+    "test:coverage": "node --test --experimental-test-coverage",
     "scan:secrets": "gitleaks detect --source . --no-git -c .gitleaks.toml"
   },
   "dependencies": {

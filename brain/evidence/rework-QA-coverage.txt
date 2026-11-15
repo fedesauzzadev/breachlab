@@ -1,0 +1,27 @@
+Rework post-QA (M-1) — 2026-11-15 — base: b0b3de4 — Node v24.19.0 — Windows
+Comando: npm run test:coverage
+Fix: script "test:coverage": "node --test --experimental-test-coverage" en package.json
+(flag verificado en node --help de v24.19.0; sin warning de deprecación).
+Esperado: el script existe, corre la suite y reporta cobertura real >= 70% líneas (NFR-9).
+Observado:
+
+$ npm run test:coverage
+  ℹ pass 37 / fail 0 / exit 0
+  ℹ start of coverage report
+  -----------------------------------------------------------------
+  file          | line % | branch % | funcs % | uncovered lines
+  -----------------------------------------------------------------
+  server.js     |  83.33 |    66.67 |   71.43 | 6-8 48 62-63 70-76
+  src           |        |          |         |
+   apikey.js    | 100.00 |    100.00 |  100.00 |
+   attacker.js  | 100.00 |    70.59 |  100.00 |
+   entries.js   | 100.00 |    100.00 |  100.00 |
+   lab.js       | 100.00 |    95.65 |  100.00 |
+   labroutes.js | 100.00 |    95.83 |  100.00 |
+   ratelimit.js | 100.00 |    91.67 |  100.00 |
+  -----------------------------------------------------------------
+  all files     |  97.82 |    92.45 |   95.83 |
+  -----------------------------------------------------------------
+
+Veredicto: VERDE. Umbral 70% cumplido con holgura (97.82% lineas vs 97.75% medido por QA:
+sube porque el test M-2 cubre la rama catch nueva de openDb en lab.js). M-1 cerrado.

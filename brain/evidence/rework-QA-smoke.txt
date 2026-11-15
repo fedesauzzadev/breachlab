@@ -1,0 +1,20 @@
+Rework post-QA (M-2, smoke funcional) — 2026-11-15 — base: b0b3de4 — Node v24.19.0 — Windows
+Repro del hallazgo original (QA-crash.txt): bytes basura en data/breachlab.db + npm start.
+Esperado (post-fix): NO muere el proceso; log claro "[breachlab] DB corrupta, recreando…",
+archivo borrado y re-seedeado; /api/health responde ok con seed 12.
+Observado:
+
+$ Set-Content data\breachlab.db 'bytes basura corruptos intencionales'
+$ node server.js   (npm start)
+  stderr: [breachlab] DB corrupta, recreando… (file is not a database)
+  stdout: [breachlab] http://127.0.0.1:3000 — sandbox local · acto 1 (normal)
+
+$ GET http://127.0.0.1:3000/api/health
+  {"status":"ok","db_entries":12,"act":1}   <- HTTP 200, re-seed completo
+
+(Nota: los "??/mojibake" en la captura de consola PowerShell son del encoding de lectura
+del archivo de salida; el log del proceso es UTF-8 correcto — mismo cosmetico ya registrado
+como L-6. No afecta.)
+
+Veredicto: VERDE. Antes: proceso muere con ERR_SQLITE_ERROR 26 crudo (QA-crash.txt).
+Ahora: proceso vivo, log accionable, reseed automatico. M-2 cerrado (NFR-10 a letra).

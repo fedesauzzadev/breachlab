@@ -1,7 +1,7 @@
 'use strict';
 // S01 — Sandbox vivo: seed fijo + endpoints + aislamiento (AC2, AC3, AC4, AC5-bind).
 // La key usada en los tests sale del ARTEFACTO del leak, no de una constante duplicada.
-const { readFileSync, mkdtempSync } = require('node:fs');
+const { readFileSync, mkdtempSync, writeFileSync } = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const test = require('node:test');
@@ -104,6 +104,16 @@ test('Invariante: seed determinista entre corridas (semilla fija)', async () => 
     return { titles, messages };
   };
   assert.deepEqual(run(), run()); // mismas 12 entries y mismos eventos, mismo orden
+});
+
+test('NFR-10/M-2: DB corrupta al arranque → se recrea y re-seedea (sin crash)', () => {
+  const dir = mkdtempSync(path.join(os.tmpdir(), 'breachlab-'));
+  const dbPath = path.join(dir, 'corrupta.db');
+  writeFileSync(dbPath, 'estos no son bytes de sqlite, es basura corrupta');
+  const lab = createLab({ file: dbPath });
+  assert.equal(lab.countEntries(), SEED_LEGIT_ENTRIES); // re-seed completo
+  assert.equal(lab.listEvents().length, 6); // timeline del seed intacto
+  lab.db.close();
 });
 
 test('NFR-4: ruta desconocida → 404 JSON sin internals', async (t) => {

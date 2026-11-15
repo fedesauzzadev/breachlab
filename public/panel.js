@@ -10,6 +10,14 @@
   };
   let lastEventId = 0;
 
+  // L-3: nodos DOM + textContent, nunca innerHTML con datos de requests (defense-in-depth).
+  const el = (tag, cls, text) => {
+    const node = document.createElement(tag);
+    if (cls) node.className = cls;
+    if (text !== undefined) node.textContent = text;
+    return node;
+  };
+
   // Estado completo del lab (contrato §2.4): actos, contadores del ataque y de la DB.
   async function pollState() {
     try {
@@ -38,9 +46,8 @@
       $('key-current').textContent = s.keys.current_masked || '—';
       const feed = $('feed'); // códigos HTTP REALES del bot (base del relato de S04)
       feed.hidden = s.attack.recent.length === 0;
-      feed.innerHTML = s.attack.recent
-        .map((r) => `<code class="${r.status >= 200 && r.status < 300 ? 'c2xx' : 'c4xx'}">${r.status}</code>`)
-        .join('');
+      feed.replaceChildren(...s.attack.recent.map((r) =>
+        el('code', r.status >= 200 && r.status < 300 ? 'c2xx' : 'c4xx', r.status)));
     } catch {
       $('conn').hidden = false; // reintenta en el próximo tick
     }
@@ -53,8 +60,8 @@
       const ul = $('timeline');
       for (const e of events) {
         const li = document.createElement('li');
-        li.innerHTML = `<span class="ts">${new Date(e.ts).toLocaleTimeString()}</span>` +
-          `<span class="sev-${e.severity}">${e.message}</span>`;
+        li.append(el('span', 'ts', new Date(e.ts).toLocaleTimeString()),
+          el('span', `sev-${e.severity}`, e.message));
         ul.appendChild(li);
         lastEventId = e.id;
         if (e.kind === 'alert') { // alerta roja visible hasta fin de la sesión (AC3)
@@ -103,9 +110,10 @@
       const ul = $('audit');
       for (const a of attempts) {
         const li = document.createElement('li');
-        li.innerHTML = `<span class="ts">${new Date(a.ts).toLocaleTimeString()}</span>` +
-          `<span><code class="c4xx">${a.status}</code> ${a.method} ${a.endpoint}` +
-          ` · key <code>${a.key_masked}</code> · ${a.reason}</span>`;
+        const detail = el('span');
+        detail.append(el('code', 'c4xx', a.status), ` ${a.method} ${a.endpoint} · key `,
+          el('code', null, a.key_masked), ` · ${a.reason}`);
+        li.append(el('span', 'ts', new Date(a.ts).toLocaleTimeString()), detail);
         ul.appendChild(li);
         lastAuditId = a.id;
       }

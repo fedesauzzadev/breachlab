@@ -1,0 +1,23 @@
+Rework post-QA (M-1, M-2, L-3) — 2026-11-15 — base: b0b3de4 — Node v24.19.0 — Windows
+Comando: npm ci && npm test
+Esperado: suite completa verde incluyendo test nuevo del caso corrupto (M-2).
+Observado:
+
+$ npm ci
+  found 0 vulnerabilities (exit 0)
+
+$ npm test   (node --test, spec reporter)
+  ...
+  [breachlab] DB corrupta, recreando… (file is not a database)   <- log M-2 emitido por el test
+  ✔ NFR-10/M-2: DB corrupta al arranque → se recrea y re-seedea (sin crash) (106.8332ms)
+  ...
+  ℹ tests 37        (antes: 36; +1 = test M-2)
+  ℹ pass 37
+  ℹ fail 0
+  ℹ cancelled 0
+  ℹ skipped 0
+  ℹ duration_ms 19486.8578
+  exit=0
+
+Veredicto: VERDE. 37/37, 0 fail, exit 0. Test M-2 crea archivo basura (no-SQLite) en tmp,
+createLab lo detecta, loguea, borra y re-seedea: countEntries()==12 y timeline==6.
