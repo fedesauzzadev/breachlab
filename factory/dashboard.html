@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NSDD Software Factory — BreachLab</title>
+<style>
+  :root{--bg:#0f1117;--card:#181b24;--line:#262b38;--tx:#e8eaf0;--mut:#8b93a7;--acc:#5b8cff;--ok:#3fb96a;--warn:#e0a93e;--bad:#e05c5c;}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--tx);font:14px/1.5 system-ui,sans-serif;padding:24px}
+  header{display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:16px}
+  h1{font-size:20px} h2{font-size:15px;margin-bottom:10px;color:var(--acc)}
+  .sub{color:var(--mut);font-size:12px}
+  nav{display:flex;gap:6px;margin-bottom:18px;flex-wrap:wrap}
+  nav button{background:var(--card);border:1px solid var(--line);color:var(--mut);padding:7px 14px;border-radius:8px;cursor:pointer;font-size:13px}
+  nav button.on{color:var(--tx);border-color:var(--acc);background:#1c2436}
+  section{display:none} section.on{display:block}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px}
+  .card h3{font-size:13px;margin-bottom:6px}
+  .card p,.card li{font-size:13px;color:var(--mut)}
+  ul{padding-left:18px} .li-ok{color:var(--tx)}
+  .chip{display:inline-block;padding:2px 9px;border-radius:99px;font-size:11px;margin:2px 4px 2px 0;border:1px solid var(--line);color:var(--mut)}
+  .st-planned{color:var(--mut)} .st-inprogress{color:var(--warn);border-color:var(--warn)}
+  .st-implemented{color:var(--acc);border-color:var(--acc)} .st-verified{color:var(--ok);border-color:var(--ok)}
+  .st-ship{color:var(--ok);border-color:var(--ok);font-weight:600} .st-noship{color:var(--bad);border-color:var(--bad);font-weight:600}
+  .timeline{border-left:2px solid var(--line);margin-left:8px;padding-left:18px;display:grid;gap:14px}
+  .tl-item{position:relative} .tl-item:before{content:"";position:absolute;left:-24px;top:5px;width:10px;height:10px;border-radius:50%;background:var(--acc)}
+  .tl-item.done:before{background:var(--ok)}
+  .kpi{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+  .kpi .card{min-width:150px;text-align:center}
+  .kpi b{display:block;font-size:22px;color:var(--tx)}
+  .kbd{background:#0d0f14;border:1px solid var(--line);border-radius:6px;padding:1px 7px;font-family:monospace;font-size:12px;color:var(--ok)}
+  .empty{color:var(--mut);font-style:italic}
+</style>
+</head>
+<body>
+<header>
+  <h1>🏭 BreachLab</h1>
+  <span class="sub">NSDD Software Factory · actualizado 2026-11-14 · post S02</span>
+</header>
+<nav>
+  <button class="on" data-t="mvp">MVP</button>
+  <button data-t="kanban">Kanban</button>
+  <button data-t="roadmap">Roadmap</button>
+  <button data-t="quality">Calidad</button>
+  <button data-t="learn">Bloqueos y aprendizajes</button>
+  <button data-t="decisions">Decisiones</button>
+</nav>
+
+<section id="mvp" class="on">
+  <h2>Entregable MVP</h2>
+  <div class="card"><ul>
+    <li>Lab interactivo 100% local del incidente real: API key filtrada → ataque → detección → matafuegos → hardening (5 actos).</li>
+    <li>Estado actual: <b>S01+S02 implementados</b> — API víctima en loopback + panel del defensor en español (estado, timeline polling 1s, botón "ver el leak") + READMEs EN/ES + gate de secrets (gitleaks 0 findings).</li>
+    <li>Pendiente del MVP: S03 ataque+detección · S04 matafuegos · S05 hardening · S06 postmortem+DoD.</li>
+    <li>Probar hoy: <span class="kbd">npm ci</span> + <span class="kbd">npm start</span> → <span class="kbd">http://127.0.0.1:3000</span></li>
+    <li>Sandbox aislado: bind solo 127.0.0.1, keys 100% falsas, cero llamadas a terceros (verificado S01 con netstat+grep).</li>
+  </ul></div>
+</section>
+
+<section id="kanban">
+  <h2>Historias y estado</h2>
+  <div class="grid">
+    <div class="card"><h3>N-0001 · H-01 Lab base</h3><span class="chip st-implemented">implemented (S01+S02, AC completas)</span><ul>
+      <li class="li-ok">☑ Health OK, seed 12, 0 eventos de seguridad</li>
+      <li class="li-ok">☑ Timeline cronológico · leak servido read-only</li>
+      <li class="li-ok">☑ Cero red externa (netstat + grep)</li>
+      <li class="li-ok">☑ READMEs EN/ES · botón panel "ver el leak"</li><li><span class="li-ok">☑ gitleaks 0 findings (validado con control negativo)</span></li>
+    </ul></div>
+    <div class="card"><h3>N-0002 · H-02 Modo ataque</h3><span class="chip st-planned">planned</span><ul>
+      <li>☐ Bot in-process con key filtrada, no se detiene solo</li><li>☐ Panel en vivo: basura crece en DB</li><li>☐ Umbral → alerta roja con hora y motivo</li><li>☐ Detener manual → estado degradado persiste</li>
+    </ul></div>
+    <div class="card"><h3>N-0003 · H-03 Matafuegos</h3><span class="chip st-planned">planned</span><ul>
+      <li>☐ Kill switch → 403, contadores frenan</li><li>☐ Rotación → key vieja muere (401)</li><li>☐ Rate limit → 429 + Retry-After</li><li>☐ Cada acción → evento en timeline</li>
+    </ul></div>
+    <div class="card"><h3>N-0004 · H-04 Hardening</h3><span class="chip st-planned">planned</span><ul>
+      <li>☐ Key como hash sha256, scope por endpoint</li><li>☐ Re-ataque rebota (401/403), 0 basura nueva</li><li>☐ Audit log con intentos bloqueados</li><li>☐ Postmortem EN legible</li>
+    </ul></div>
+    <div class="card"><h3>N-0005 · H-05 Modo guiado + reinicio (V1)</h3><span class="chip st-planned">planned</span><ul><li>☐ Pasos numerados con siguiente resaltado</li><li>☐ Reiniciar incidente sin reiniciar proceso</li></ul></div>
+    <div class="card"><h3>N-0006 · H-06 Escenario key sin scope (V1)</h3><span class="chip st-planned">planned</span><ul><li>☐ Key válida sin escritura → 403 + audit</li><li>☐ Panel conecta con mínimo privilegio</li></ul></div>
+    <div class="card"><h3>N-0007 · H-07 Serie de labs (V2)</h3><span class="chip st-planned">planned</span><ul><li>☐ Escenarios elegibles, ciclo completo c/u</li></ul></div>
+    <div class="card"><h3>N-0008 · H-08 Export de evidencia (V2)</h3><span class="chip st-planned">planned</span><ul><li>☐ Archivo legible con cronología sin correr nada</li></ul></div>
+  </div>
+</section>
+
+<section id="roadmap">
+  <h2>Entregas de valor</h2>
+  <div class="timeline">
+    <div class="tl-item"><h3>V0 — MVP: el incidente completo (S01..S06)</h3><p>S01 Sandbox vivo <b style="color:var(--ok)">✓ entregado</b> · S02 Panel+docs+secrets <b style="color:var(--ok)">✓ entregado</b> · S03 Ataque+detección · S04 Matafuegos · S05 Hardening · S06 Postmortem+DoD — <i>en plan</i>. Valor: la demo completa de <5 min.</p></div>
+    <div class="tl-item"><h3>V1 — Narración sin fricción (S07)</h3><p>Modo guiado paso a paso + reinicio del incidente + escenario key-sin-scope. — <i>futuro</i>. Necesita: V0 aprobado.</p></div>
+    <div class="tl-item"><h3>V2 — Serie de labs + export (S08)</h3><p>Nuevos vectores de filtración como escenarios elegibles + export de evidencia. — <i>futuro</i>. Necesita: V1.</p></div>
+  </div>
+</section>
+
+<section id="quality">
+  <h2>Verificación y QA</h2>
+  <div class="kpi">
+    <div class="card"><b>9/9</b>tests verdes (S01+S02)</div>
+    <div class="card"><b>0</b>findings gitleaks (gate activo)</div>
+    <div class="card"><b>—</b>p95 — pendiente</div>
+    <div class="card"><b>—</b>QA adversarial — pendiente (Fase 4)</div>
+    <div class="card"><b>—</b>veredicto SHIP/NO-SHIP — pendiente</div>
+  </div>
+</section>
+
+<section id="learn">
+  <h2>Bloqueos y aprendizajes</h2>
+  <div class="grid"><div class="card"><p class="empty">— pendiente — sin bloqueos escalados hasta ahora (S01: 1 intento fallido menor resuelto in-situ)</p></div></div>
+</section>
+
+<section id="decisions">
+  <h2>Decisiones (ADRs)</h2>
+  <div class="grid">
+    <div class="card"><h3>D-0001 · Supuestos init no-interactivo</h3><p>language es, models por tier, commands al scaffold (ya estampados). Reversible.</p></div>
+    <div class="card"><h3>D-0002 · Stack</h3><p>Node 24 + Express (1 dep) + node:sqlite nativo + vanilla sin build step. npm install nunca compila.</p></div>
+    <div class="card"><h3>D-0003 · Arquitectura sandbox</h3><p>Proceso único; bot ataca por HTTP loopback real (401/403/429 genuinos); bind solo 127.0.0.1.</p></div>
+    <div class="card"><h3>D-0004 · Semántica del incidente</h3><p>Bot 4 rps · umbral 30/10s · rate limit 10/10s · cooldown 15s · seed 12 — números fijados, dev no decide.</p></div>
+  </div>
+</section>
+
+<script>
+  document.querySelectorAll('nav button').forEach(b=>b.addEventListener('click',()=>{
+    document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('on',x===b));
+    document.querySelectorAll('section').forEach(s=>s.classList.toggle('on',s.id===b.dataset.t));
+  }));
+</script>
+</body>
+</html>
