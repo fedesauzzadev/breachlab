@@ -44,6 +44,9 @@ function buildApp(lab) {
     res.sendFile(path.join(__dirname, 'repo-sim', 'config.json'));
   });
 
+  // Panel del defensor (S02): vanilla static, sin build step (plan §2.1). index.html queda en /.
+  app.use(express.static(path.join(__dirname, 'public')));
+
   // 404 JSON sin internals (NFR-4: sin rutas/stack/versiones en cuerpos de error).
   app.use((_req, res) => res.status(404).json({ error: 'not_found' }));
   // Handler central (plan §3): 500 sin internals.

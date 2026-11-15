@@ -1,0 +1,21 @@
+S02 — VERIFICACIÓN DE TESTS (2026-11-14)
+Comando: npm ci 2>&1 | tail -3; npm test
+Esperado: install limpio + suite completa verde (9 tests: 8 de S01 + 1 nuevo de S02), exit 0.
+
+Observado (salida real):
+  found 0 vulnerabilities
+  > node --test
+  ✔ AC5: servidor efímero bindeado EXCLUSIVAMENTE a 127.0.0.1
+  ✔ AC2: /api/health sin key → ok, seed de 12, acto 1
+  ✔ AC2: /api/entries con la key DEL LEAK → 12 legit, 0 garbage
+  ✔ Contrato §2.4: /api/entries sin key o con key mala → 401 invalid_api_key
+  ✔ AC3: timeline con eventos normales cronológicos y CERO de seguridad
+  ✔ AC4: /leak/config.json sirve el artefacto read-only con la key falsa
+  ✔ Invariante: seed determinista entre corridas (semilla fija)
+  ✔ NFR-4: ruta desconocida → 404 JSON sin internals
+  ✔ S02/AC1+AC4: panel static — / sirve HTML con título, /panel.js sirve JS
+  ℹ tests 9 · pass 9 · fail 0
+  exit 0
+
+Test nuevo S02: test/lab.test.js — GET / → 200 + <title>…BreachLab…</title>; GET /panel.js → 200 + content-type javascript.
+Veredicto: OK. Suite completa S01+S02 verde.

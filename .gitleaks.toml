@@ -1,0 +1,14 @@
+# Gitleaks — BreachLab (NFR-2, plan §3).
+# Las reglas por defecto se EXTIENDEN (useDefault): un secret real de terceros haría fallar el gate.
+# Allowlist única: las keys falsas de la demo, prefijo propio sk_breachlab_demo_
+# (FAKE BY DESIGN — ADR D-0003 §4, visible en repo-sim/config.json y READMEs).
+title = "BreachLab — secrets gate (solo keys falsas allowlisted, FAKE BY DESIGN)"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Keys 100% falsas de la demo: prefijo propio, documentadas FAKE BY DESIGN"
+regexes = [
+  '''sk_breachlab_demo_\S*''',
+]

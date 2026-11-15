@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<!-- BreachLab — consola del defensor (S02, acto 1). UI en español, términos técnicos en inglés. Cero frameworks, cero build. -->
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BreachLab · Consola del defensor</title>
+<style>
+  :root { --bg:#0d1117; --panel:#161b22; --line:#30363d; --fg:#c9d1d9; --dim:#8b949e; --green:#3fb950; --red:#f85149; --amber:#d29922; }
+  * { box-sizing:border-box; margin:0; }
+  body { background:var(--bg); color:var(--fg); font:14px/1.5 system-ui,sans-serif; max-width:880px; margin:0 auto; padding:24px; }
+  h1 { font-size:20px; } h1 small { color:var(--dim); font-weight:400; }
+  section { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:16px; margin-top:16px; }
+  h2 { font-size:13px; text-transform:uppercase; letter-spacing:.08em; color:var(--dim); margin-bottom:12px; }
+  .badge { display:inline-block; padding:2px 10px; border-radius:99px; font-weight:600; }
+  .ok { background:rgba(63,185,80,.15); color:var(--green); }
+  .down { background:rgba(248,81,73,.15); color:var(--red); }
+  .stats { display:flex; gap:24px; margin-top:8px; flex-wrap:wrap; }
+  .stats b { font-size:18px; display:block; } .stats span { color:var(--dim); font-size:12px; }
+  #timeline { list-style:none; max-height:340px; overflow-y:auto; }
+  #timeline li { display:flex; gap:12px; padding:4px 0; border-bottom:1px solid var(--line); font-size:13px; }
+  #timeline .ts { color:var(--dim); font-family:ui-monospace,monospace; flex:0 0 80px; }
+  .sev-critical { color:var(--red); } .sev-warning { color:var(--amber); }
+  button { background:#21262d; color:var(--fg); border:1px solid var(--line); border-radius:6px; padding:8px 14px; cursor:pointer; font:inherit; }
+  button:hover { border-color:var(--fg); }
+  pre { background:#010409; border:1px solid var(--line); border-radius:6px; padding:12px; overflow-x:auto; margin-top:12px; font-size:13px; }
+  .warn { color:var(--amber); font-size:12px; margin-top:8px; }
+  .conn-lost { color:var(--red); font-size:12px; }
+  code { font-family:ui-monospace,monospace; }
+</style>
+</head>
+<body>
+<h1>BreachLab <small>· consola del defensor</small></h1>
+
+<section>
+  <h2>Estado del lab</h2>
+  <span id="conn" class="conn-lost" hidden>conexión perdida — reintentando…</span>
+  <p><span id="state" class="badge down">cargando…</span></p>
+  <div class="stats">
+    <div><b id="act">—</b><span>acto (1–5)</span></div>
+    <div><b id="entries">—</b><span>registros en la DB</span></div>
+  </div>
+</section>
+
+<section>
+  <h2>Timeline</h2>
+  <ul id="timeline"></ul>
+</section>
+
+<section>
+  <h2>Origen del incidente</h2>
+  <p>Una <code>config.json</code> "versionada" en el repo simulado (<code>repo-sim/</code>) dejó la API key expuesta.
+     Esa mala práctica es la que dispara toda la historia. Buscala acá:</p>
+  <button id="leak-btn">Ver el leak</button>
+  <pre id="leak" hidden></pre>
+  <p class="warn">Key 100% falsa (FAKE BY DESIGN), prefijo propio <code>sk_breachlab_demo_</code> ·
+     sandbox aislada: todo corre en 127.0.0.1, cero llamadas externas.</p>
+</section>
+
+<script src="/panel.js"></script>
+</body>
+</html>

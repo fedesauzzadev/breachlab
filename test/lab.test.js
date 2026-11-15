@@ -114,3 +114,13 @@ test('NFR-4: ruta desconocida → 404 JSON sin internals', async (t) => {
   assert.deepEqual(body, { error: 'not_found' });
   assert.ok(!JSON.stringify(body).includes('/api/no-existe')); // sin rutas en el body
 });
+
+test('S02/AC1+AC4: panel static — / sirve HTML con título, /panel.js sirve JS', async (t) => {
+  const { base } = await withServer(t);
+  const page = await fetch(`${base}/`);
+  assert.equal(page.status, 200);
+  assert.match(await page.text(), /<title>[^<]*BreachLab[^<]*<\/title>/i);
+  const js = await fetch(`${base}/panel.js`);
+  assert.equal(js.status, 200);
+  assert.match(js.headers.get('content-type') || '', /javascript/);
+});

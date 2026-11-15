@@ -8,7 +8,8 @@
   },
   "scripts": {
     "start": "node server.js",
-    "test": "node --test"
+    "test": "node --test",
+    "scan:secrets": "gitleaks detect --source . --no-git -c .gitleaks.toml"
   },
   "dependencies": {
     "express": "^5.1.0"

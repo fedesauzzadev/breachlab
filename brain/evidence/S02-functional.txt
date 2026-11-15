@@ -1,0 +1,21 @@
+S02 — VERIFICACIÓN FUNCIONAL DEL PANEL (2026-11-14)
+Comando: npm start (bind 127.0.0.1:3000) + curl.exe
+Esperado: panel accesible en / (HTML con título), /panel.js servido como JS, endpoints de datos del panel OK.
+
+Observado (salida real):
+  [breachlab] http://127.0.0.1:3000 — sandbox local · acto 1 (normal)
+
+  GET /            → <!DOCTYPE html> … <title>BreachLab · Consola del defensor</title> (HTML del panel, CSS embebido)
+  GET /panel.js    → 'use strict'; // Panel del defensor (S02): polling 1s… (JS servido)
+  GET /leak/config.json → {"service":"breachlab-api","environment":"production-sim",
+                        "api_key":"sk_breachlab_demo_LEAKED_7f3a9c",
+                        "_note":"SIMULACION: … key 100% FALSA (by design)."}   ← el botón "Ver el leak" consume esto
+  GET /api/health  → {"status":"ok","db_entries":12,"act":1}                    ← estado del panel: acto 1 normal
+  GET /api/lab/timeline → 6 eventos (1 system + 5 traffic, severity info, ts ISO-8601,
+                        key enmascarada sk_b…3a9c)                              ← timeline del panel
+
+Flujo del panel verificado por composición: panel.js (revisado) hace polling 1s a /api/health y
+/api/lab/timeline?since=<id>, y el botón "Ver el leak" (index.html → panel.js) fetch /leak/config.json
+y renderiza la key falsa con aviso FAKE BY DESIGN embebido en la sección.
+Server detenido tras la verificación (Stop-Process por OwningProcess del puerto 3000).
+Veredicto: OK — AC1 (panel en localhost tras 2 comandos, sin env) y AC4 (botón muestra el leak con la key falsa).
