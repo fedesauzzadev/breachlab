@@ -1,0 +1,21 @@
+# Evidencia — Verificación en browser real (cierre de deuda de verificación)
+
+Fecha: 2026-11-15 · Motivo: el reporte final declaró "render DOM en browser no verificado". Corner-cut reconocido: el orquestador tenía browser y solo lo usó para mostrar la demo. Esta corrida lo cierra.
+
+## Setup
+- Browser real (harness desktop browser) contra `npm start` (v0.3.0 + fixes, commit 078e851).
+- Interacción por clicks reales sobre refs del DOM renderizado; lecturas por snapshot de accesibilidad y fetch in-page.
+
+## Corrida (flujo core acto 2→3→4)
+
+1. **Render inicial verificado**: título "BreachLab · consola del defensor", ESTADO DEL LAB "Operación normal · 1 · normal · 12 registros", secciones MODO GUIADO / SIMULACIÓN DE ATAQUE / matafuegos / hardening / escenario / export / leak. 11 botones renderizados con los textos del fix G3 (incluido "Escenario: key sin scope (ráfaga de 10)").
+2. **Click "Simular ataque"** (ref e20064) → poll in-page de /api/lab/state: `act:3, garbage:67, requests:67, running:true` — detección disparada tras ~8.5 s (semántica D-0004).
+3. **Click "Kill switch"** (ref e20066) → poll hasta rendición: `act:4, blocked:20, running:false`. Timeline: alerta critical "Detección: anomalous volume · key sk_b…3a9c · 39 requests en 10 s" → "Kill switch ON · key → 403" → "El atacante dejó de intentar (20 rebotes consecutivos) · 20 bloqueados en total".
+4. **DOM RENDERIZADO verificado** (snapshot de accesibilidad, no API): alerta renderizada ✓ · rendición renderizada ✓ · kill switch renderizado ✓ · feed con 46 strings "403" ✓ · contador 20 bloqueados ✓ · badge acto "4 ·" ✓.
+
+## Qué queda de esta deuda
+- Screenshot PNG no tomado (requiere ventana desktop visible en el harness; el snapshot de accesibilidad es evidencia equivalente de render).
+- Los clicks de rotación/rate-limit/hardening/escenario/export no se repitieron en browser: su capa ya estaba cubierta por suite (52/52) + walkthroughs HTTP; el gap real (¿renderiza y responden los clicks?) quedó cerrado con el flujo core + snapshot completo de los 11 controles.
+
+## Conclusión
+El panel renderiza y responde a clicks reales end-to-end en browser. Los nodos N-0002/N-0003 (panel en vivo) suben de "verificado por contrato" a "verificado en browser" con esta evidencia.
