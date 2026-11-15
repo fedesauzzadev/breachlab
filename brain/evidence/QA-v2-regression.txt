@@ -1,0 +1,23 @@
+# QA-v2 probe [regression] DB propia: C:\Users\hp\AppData\Local\Temp\qa-v2-regression-S8dS1U\qa.db puerto 64332
+
+== R1: ciclo completo vector base repo-config (5 actos) ==
+  OK /leak/config.json 200 contiene la key del vector base
+  OK deteccion: acto 3 (alerta disparada)
+  OK matafuegos+hardening: acto 5 storage sha256
+  OK hitos 1-4 en true
+  OK hito 5 reattack_bounced true
+  OK re-ataque 0 basura nueva (1 -> 1)
+  OK re-ataque auditado: 10x 403 key_disabled (los 429 del rate-limit activo no auditan: cadena rateLimit->apikey, L-4)
+  OK ataque original escribio basura (garbage=1)
+  OK export: los 12 eventos del timeline presentes
+  OK export: audit + postmortem presentes
+
+== R2: escenario scopeless-key (V1) ==
+  OK scopeless 202
+  OK scopeless: burst no agrega basura (1 -> 1), 10 rebotes 403 insufficient_scope auditados
+
+== R3: reset restaura seed, demo re-jugable ==
+  OK reset: seed exacto acto 1 (12/0, 6 eventos, audit 0, plaintext)
+  OK re-jugable: basura vuelve a crecer (3)
+
+# RESUMEN [regression]: 14 OK / 0 HALLAZGOS

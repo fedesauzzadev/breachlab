@@ -17,14 +17,16 @@ Negocio: **G2 aprobado** (demo en vivo) · **G3: V1 con ajustes → aplicados** 
 ## QA
 - V0: 0 crit / 0 high / 2 med resueltos / 3 low abiertos (L-4 L-5 L-6)
 - V1: 0 crit / 2 med resueltos (M-3 race TOCTOU con test de socket crudo, M-4 docs) / L-7 resuelto / L-8 L-9 abiertos
+- V2: **0 crit / 0 high** (`factory/qa-report-v2.md`, 2026-11-15) — fuzz 69 checks, traversal /leak/ seguro, export gigante OK · nuevos menores L-10 (escape `|` en export markdown) y L-11 (respuesta de switch concurrente)
 - Rounds de rework: 2 + 1 fix de feedback directo del Negocio
 
 ## Bloqueos
 - 0 escalados · 1 sesión muerta por usage limit (recuperada) · L-03 (DB compartida demo/smoke) resuelto estructuralmente con BREACHLAB_DB
 
 ## Riesgo residual
-- Render DOM en browser real no automatizado (verificado por contrato HTTP + strings servidos) · portabilidad Linux/Mac sin máquina real · CI: primer run en GitHub al cierre de este scorecard
+- Verificación de cierre de deuda (2026-11-15): browser real verificado (brain/evidence/browser-e2e.txt: clicks → detección → rendición renderizados) · CI 3-OS verde (run 43748655542: Linux/macOS/Windows) · QA formal V2 SHIP (factory/qa-report-v2.md)
+- Deuda menor declarada: L-4 L-5 L-6 L-8 L-9 L-10 L-11 (ninguna toca AC; L-10/L-11 del delta V2)
 
 ## Estado final
-Roadmap V0/V1/V2 completo. Deuda menor declarada: L-4 L-5 L-6 L-8 L-9 (ninguna toca AC).
+Roadmap V0/V1/V2 completo, publicado y verificado en 3 OS + browser real. Cierre de proyecto: 2026-11-15.
 

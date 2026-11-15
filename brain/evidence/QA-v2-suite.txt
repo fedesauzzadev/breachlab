@@ -1,0 +1,47 @@
+# QA V2 - Suite completa + NFRs + smoke - delta S09a/S09b (71530ef..595d327)
+Fecha: 2026-11-15 - HEAD QA: 595d327 - Node v24.19.0 - npm 11.17.0 - Windows
+DB demo (data/breachlab.db) INTACTA: mtime 2026-11-15T18:45:38.69Z antes y despues de TODO el round (fix L-03 respetado).
+
+## 1. Instalacion limpia + suite
+- node_modules borrado -> npm ci: ok, found 0 vulnerabilities.
+- npm test: tests 52, pass 52, fail 0, cancelled 0, duration 25405 ms.
+  (47 preexistentes V0/V1 + 4 s09a + 1 s09b; incluye M-3 race test y N-0007/N-0008).
+- npm run test:coverage: all files 98.24% lineas / 90.56% branch / 96.97% funcs
+  (apikey 100/100/100, scenarios 100/100/100, labroutes 99.62, lab 100, attacker 100,
+  entries 100, ratelimit 100, server.js 82.50 - bootstrap require.main fuera de tests;
+  umbral plan >=70%: VERDE).
+- npm audit --omit=dev: found 0 vulnerabilities.
+
+## 2. NFR-2 secrets (gitleaks 8.30.1 por ruta absoluta, L-05)
+- gitleaks detect --source . --no-git -c .gitleaks.toml (ruta absoluta):
+  scanned ~410092 bytes in 184ms - no leaks found - exit 0.
+- npm run scan:secrets en esta maquina: FALLA (gitleaks no reconocido) -> L-05 sigue.
+
+## 3. NFR-3 aislamiento (grep clientes HTTP server-side)
+- grep de fetch/net.connect/http.request/axios en src/: unico match src/attacker.js:59
+  (URL loopback constante). El delta NO agrego IO saliente.
+- src/labroutes.js /export usa readFileSync LOCAL de docs/postmortem.md (no es IO de red).
+- public/leak/legacy-bundle.js contiene fetch CLIENT-SIDE (codigo de navegador simulado,
+  jamas cargado por el panel: solo mostrado como texto en el visor). NFR-3 aplica a src/.
+
+## 4. Smoke BREACHLAB_DB (fix L-03 estructural, commit afd5b39)
+- node server.js con BREACHLAB_DB=tmp propio PORT=4177: /api/health ok 12/act1,
+  /api/lab/state scenario=repo-config, /api/lab/export 200 text/markdown 2035 bytes.
+- data/breachlab.db (demo viva): mtime SIN cambios tras el round completo.
+
+## 5. NFR-7 colateral (loopback)
+- p95 GET /api/lab/state = 20.9 ms (max 50.6) - 60 samples (umbral plan: < 200 ms).
+- p95 GET /api/lab/scenarios = 16.2 ms - 60 samples.
+- p95 GET /api/lab/export = 17.2 ms - 40 samples (acto 1, 2035 B).
+- export gigante (507 eventos, 69858 bytes): 23/16/14 ms en 3 corridas.
+
+## 6. CI del repo publicado (github.com/fedesauzzadev/breachlab)
+- GitHub API: run #7 (head_sha 595d327 = HEAD bajo QA), workflow CI, conclusion success,
+  completed 2026-11-15T18:49:11Z. Matriz 3 OS en ci.yml (ubuntu/macos/windows, Node 24).
+
+## 7. DoD
+- package.json version 0.3.0 + repository field.
+- CHANGELOG.md: entrada [0.3.0] 2026-11-15 (S09 serie + export) - UTF-8 real
+  (26 em-dash, 0 replacement chars; mojibake previo = display PowerShell, L-06).
+- README EN/ES: seccion Nuevo en v0.3.0 describe serie + export (verificado funcional).
+- LICENSE MIT intacto. 0 TODO/FIXME reales (1 match = palabra inglesa todo en prosa).

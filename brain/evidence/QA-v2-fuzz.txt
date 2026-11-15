@@ -1,0 +1,111 @@
+# QA-v2 probe [fuzz] DB propia: C:\Users\hp\AppData\Local\Temp\qa-v2-fuzz-7vUoQc\qa.db puerto 55113
+
+== P1: GET /api/lab/scenarios + POST /scenarios/:id fuzz ==
+  OK catalogo 200 con 3 vectores, current repo-config
+  OK campos id/name/origin/leak_url/leak_kind en los 3
+  OK id "nope" -> 404 not_found
+  OK id "server-log/" -> 404 not_found
+  OK id "/server-log" -> 404 not_found
+  OK id "server-log%00" -> 404 not_found
+  OK id "..%2F..%2Fserver.js" -> 404 not_found
+  OK id "%2e%2e%2fserver.js" -> 404 not_found
+  OK id "SERVER-LOG" -> 404 not_found
+  OK id "server%20log" -> 404 not_found
+  OK id "xxxxxxxxxxxxxxxxxxxxxxxx"(+10240) -> 404 not_found
+  OK id "явектор" -> 404 not_found
+  OK id "repo-config " -> 404 not_found
+  OK id "null" -> 404 not_found
+  OK id "0" -> 404 not_found
+  OK id "true" -> 404 not_found
+  OK id "{}" -> 404 not_found
+  OK GET /scenarios/server-log -> 404
+  OK PUT /scenarios/server-log -> 404
+  OK PATCH /scenarios/server-log -> 404
+  OK DELETE /scenarios/server-log -> 404
+  OK body [campo extra] -> 400
+  OK body [array] -> 400
+  OK body [string] -> 400
+  OK body [numero] -> 400
+  OK body [boolean] -> 400
+  OK body [null literal] -> 400
+  OK body [JSON roto] -> 400
+  OK body [10KB basura] -> 400
+  OK body [deep nest] -> 400
+  OK body [sin content-type] -> 400
+  OK body [text/plain] -> 400
+  OK body [body vacio con CT json] -> 200
+  OK estado tras switch valido: server-log acto1 12/0
+
+== P2: cambiar vector DURANTE ataque activo / burst escenario 2 ==
+  OK switch con bot corriendo -> 400 detenga el ataque
+  OK vector NO cambia ante el 400
+  OK scopeless-key 202 (burst corriendo)
+  OK switch durante burst escenario 2 -> 400
+  OK burst escenario 2 no escribio basura
+  OK burst escenario 2 auditado (10 filas)
+
+== P3: switch con hardening+kill activo - keys viejas colgadas? storage? ==
+  DB pre-switch (endurecido): [{"label":"leaked-repo-config","has_plain":0,"has_hash":1,"scope":null,"status":"disabled"},{"label":"scenario-scopeless","has_plain":0,"has_hash":1,"scope":null,"status":"revoked"},{"label":"rotated","has_plain":0,"has_hash":1,"scope":"write:entries","status":"active"}]
+  storage pre-switch: sha256
+  OK switch con hardening -> 200
+  OK flags/storage reseteados a acto 1 plaintext
+  OK api_keys queda SOLO la key del vector nuevo (0 colgadas)
+  OK leaked_masked = sk_b…1d7e (vector nuevo)
+  OK audit 0 y timeline re-sembrado 7 eventos (system+narracion+5 traffic)
+  HALLAZGO entries [{"kind":"legit","n":12}]
+  OK ataque post-switch escribe basura con la key del vector nuevo (garbage=3)
+  OK vuelta a repo-config: timeline de 6 (sin narracion)
+
+== P4: GET /api/lab/export - acto 1, inyeccion markdown, timeline gigante, doble export ==
+  OK acto 1: 200 text/markdown
+  OK content-disposition attachment filename
+  OK acto 1: audit vacio narrado + nota FAKE
+  OK HEAD /export con query basura -> 200 (headers)
+  OK POST /export -> 404/400
+  OK POST inyectado rebota 403 (auditable)
+  OK GET con key de pipes rebota 401 (auditable)
+  audit rows: [{"endpoint":"/api/entries","key_masked":"|AB|…|CD|"},{"endpoint":"/api/entries?x=|FAKE|COL|CELDA|","key_masked":"sk_b…3a9c"}]
+  HALLAZGO HALLAZGO markdown: fila(s) de tabla con contenido inyectado del atacante -> ["| 1 | 2026-11-15T18:57:00.850Z | sk_b…3a9c | POST | /api/entries?x=|FAKE|COL|CELDA| | 403 | insufficient_scope |","| 2 | 2026-11-15T18:57:00.860Z | |AB|…|CD| | GET | /api/entries | 401 | invalid_api_key |"]
+  500 rotate-key en 13431 ms -> timeline events=507
+  OK export gigante 200 con header exacto (507 eventos)
+  export gigante: 69858 bytes tiempos ms=[23,16,14]
+  OK export gigante responde < 2s en las 3 corridas
+  OK doble export concurrente: 200 ambos, mismo largo
+  OK export con ataque corriendo -> 200 sin crash
+
+== P5: leak artifacts - path traversal ==
+  OK /leak/error.log 200 con la key falsa
+  OK /leak/legacy-bundle.js 200 con la key falsa
+RAW /leak/../server.js :: HTTP/1.1 404 Not Found :: body-start="{\"error\":\"not_found\"}"
+RAW /leak/..%2Fserver.js :: HTTP/1.1 404 Not Found :: body-start="{\"error\":\"not_found\"}"
+RAW /leak/%2e%2e%2f%2e%2e%2fserver.js :: HTTP/1.1 404 Not Found :: body-start="{\"error\":\"not_found\"}"
+RAW /leak/..%5C..%5Cserver.js (backslash) :: HTTP/1.1 404 Not Found :: body-start="{\"error\":\"not_found\"}"
+RAW /leak/error.log/../../server.js :: HTTP/1.1 404 Not Found :: body-start="{\"error\":\"not_found\"}"
+RAW /leak/ (dir listing) :: HTTP/1.1 404 Not Found :: body-start="{\"error\":\"not_found\"}"
+RAW /leak/../src/scenarios.js :: HTTP/1.1 404 Not Found :: body-start="{\"error\":\"not_found\"}"
+  OK /data/breachlab.db -> 404 (fuera de public/)
+  OK /leak/nonexistent.log -> 404
+
+== P6: switches concurrentes (carrera) ==
+  OK carrera 1: estado consistente (scenario=server-log, seed=leaked-server-log, 12/0, 7 eventos)
+  HALLAZGO carrera 1: respuesta de switch nombra vector distinto al activo (A={"scenario":"frontend-bundle","reset":true} B={"scenario":"server-log","reset":true} activo=server-log)
+  OK carrera 2: estado consistente (scenario=frontend-bundle, seed=leaked-frontend-bundle, 12/0, 7 eventos)
+  HALLAZGO carrera 2: respuesta de switch nombra vector distinto al activo (A={"scenario":"server-log","reset":true} B={"scenario":"frontend-bundle","reset":true} activo=frontend-bundle)
+  OK carrera 3: estado consistente (scenario=server-log, seed=leaked-server-log, 12/0, 7 eventos)
+  HALLAZGO carrera 3: respuesta de switch nombra vector distinto al activo (A={"scenario":"frontend-bundle","reset":true} B={"scenario":"server-log","reset":true} activo=server-log)
+RAW /leak/../server.js :: TIMEOUT
+RAW /leak/..%2Fserver.js :: TIMEOUT
+RAW /leak/%2e%2e%2f%2e%2e%2fserver.js :: TIMEOUT
+RAW /leak/..%5C..%5Cserver.js (backslash) :: TIMEOUT
+RAW /leak/error.log/../../server.js :: TIMEOUT
+RAW /leak/ (dir listing) :: TIMEOUT
+RAW /leak/../src/scenarios.js :: TIMEOUT
+  OK carrera 4: estado consistente (scenario=frontend-bundle, seed=leaked-frontend-bundle, 12/0, 7 eventos)
+  HALLAZGO carrera 4: respuesta de switch nombra vector distinto al activo (A={"scenario":"server-log","reset":true} B={"scenario":"frontend-bundle","reset":true} activo=frontend-bundle)
+  OK carrera 5: estado consistente (scenario=server-log, seed=leaked-server-log, 12/0, 7 eventos)
+  HALLAZGO carrera 5: respuesta de switch nombra vector distinto al activo (A={"scenario":"frontend-bundle","reset":true} B={"scenario":"server-log","reset":true} activo=server-log)
+  OK carrera 6: estado consistente (scenario=frontend-bundle, seed=leaked-frontend-bundle, 12/0, 7 eventos)
+  HALLAZGO carrera 6: respuesta de switch nombra vector distinto al activo (A={"scenario":"server-log","reset":true} B={"scenario":"frontend-bundle","reset":true} activo=frontend-bundle)
+  OK health 12 tras carreras
+
+# RESUMEN [fuzz]: 69 OK / 8 HALLAZGOS
