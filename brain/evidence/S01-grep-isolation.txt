@@ -1,0 +1,14 @@
+﻿S01 — Aislamiento NFR-3b: grep de clientes HTTP salientes (2026-11-14)
+=======================================================================
+Comando: Select-String -Path server.js,src\*.js,test\*.js -Pattern 'fetch\(|net\.connect|axios|http\.request'
+
+Código de PRODUCTO (server.js, src/lab.js):
+  CERO coincidencias — no existe ningún cliente HTTP saliente en S01.
+  (src/attacker.js llega en S03; será el único, con URL loopback constante.)
+
+Tests (test/lab.test.js, líneas 36,45,62,70,86,94,115):
+  Solo `fetch(...)` del cliente de tests contra el servidor efímero
+  127.0.0.1:<puerto-efímero> — integración HTTP real por diseño (D-0002),
+  nunca sale de loopback.
+
+Conclusión: ✓ sin llamadas a hosts externos desde código (AC5/NFR-3b).

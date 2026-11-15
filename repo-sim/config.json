@@ -1,0 +1,6 @@
+{
+  "service": "breachlab-api",
+  "environment": "production-sim",
+  "api_key": "sk_breachlab_demo_LEAKED_7f3a9c",
+  "_note": "SIMULACION: config 'versionada' con la API key expuesta. DEMO EDUCATIVA — key 100% FALSA (by design)."
+}

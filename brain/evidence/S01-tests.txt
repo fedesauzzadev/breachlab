@@ -1,0 +1,38 @@
+S01 — Sandbox vivo · npm ci && npm test (2026-11-14)
+====================================================
+Entorno: Windows (win32), Node.js v24.19.0, breachlab@0.1.0.
+
+1) npm ci (después de npm install que generó package-lock.json):
+  (…) "found 0 vulnerabilities"
+
+2) npm test → node --test (salida íntegra de la corrida):
+
+> breachlab@0.1.0 test
+> node --test
+
+✔ AC5: servidor efímero bindeado EXCLUSIVAMENTE a 127.0.0.1 (106.3189ms)
+✔ AC2: /api/health sin key → ok, seed de 12, acto 1 (132.0706ms)
+✔ AC2: /api/entries con la key DEL LEAK → 12 legit, 0 garbage (91.4479ms)
+✔ Contrato §2.4: /api/entries sin key o con key mala → 401 invalid_api_key (97.4009ms)
+✔ AC3: timeline con eventos normales cronológicos y CERO de seguridad (88.0337ms)
+✔ AC4: /leak/config.json sirve el artefacto read-only con la key falsa (86.8693ms)
+✔ Invariante: seed determinista entre corridas (semilla fija) (163.5907ms)
+✔ NFR-4: ruta desconocida → 404 JSON sin internals (84.7425ms)
+
+ℹ tests 8
+ℹ suites 0
+ℹ pass 8
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1073.8681
+
+(Re-corrida posterior a `npm ci` limpio: mismos 8/8 pass, duration_ms 1128.0235, 0 fail → exit 0.
+ Corrida FINAL sobre el código definitivo —post-recorte de comentarios, sin cambios de lógica—:
+ 8/8 pass, 0 fail, duration_ms 1309.5783 → exit 0.)
+
+Nota fix durante el slice: script de test original `node --test test/` falló en
+Windows ("Cannot find module ...test") → cambiado a `node --test` (autodiscovery).
+
+Resultado: ✓ npm ci && npm test → exit 0, 8/8 tests verdes (NFR-9 para S01).
