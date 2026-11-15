@@ -1,30 +1,30 @@
-# Scorecard — Review G2 (MVP V0)
+# Scorecard — Reviews G2 (MVP V0) + G3 (V1/V2)
 
-Fecha: 2026-11-15 · Veredicto QA: **SHIP** · Negocio: **APROBADO** (vio la demo corriendo en browser)
+Fecha: 2026-11-15 · Veredictos QA: **SHIP** (V0) · **SHIP** (V1) · V2 build verified (QA de incremento pendiente si se pide)
+Negocio: **G2 aprobado** (demo en vivo) · **G3: V1 con ajustes → aplicados** (rendición del atacante + escenarios finitos) · **V2 aprobada** · **Publicación pública aprobada**
 
 ## Entregas
-- Historias entregadas / planificadas: **4/4** (H-01..H-04) · Nodos: N-0001..N-0004 **verified** (QA independiente, level full)
-- Slices: S01..S06 + rework QA (1 round)
+- Historias: **8/8** (H-01..H-08) · Nodos N-0001..N-0008: **verified**
+- Slices: S01..S06 (V0) + S07 (CI+pub) + S08 (V1) + S09a/S09b (V2, split anti-monster) + rework QA V0 + rework QA V1 + fix feedback G3
+- Publicado: **github.com/fedesauzzadev/breachlab** (público, CI en cada push)
 
 ## AC
-- Cumplidas / totales: **28/28** (7 por historia — auditadas por QA contra evidencia)
+- 8/8 historias con AC completas auditadas (V0/V1 por QA adversarial; V2 por dev con evidencia + suite)
 
 ## Tests
-- **37/37 verdes**, 0 rojas (instalación limpia `npm ci && npm test`)
-- Cobertura: **97.82% líneas** (umbral 70%)
-- p95 medido: **16.4 ms** GET /api/lab/state · **22.8 ms** POST /api/entries (umbral 200 ms)
-- Walkthrough 5 actos: **14.5 s** (gate 300 s)
+- **52/52 verdes** · cobertura ~98% · p95 16–23 ms · walkthrough 5 actos ~15 s (rendición del atacante incluida)
 
 ## QA
-- Hallazgos: **0 critical · 0 high · 2 medium (RESUELTOS en a1d0e97) · 3 low** (L-3 resuelto; L-4 doc, L-5 PATH, L-6 cosmético — deuda menor registrada)
-- Rounds de rework: 1 (3/3 hallazgos del rework cerrados, suite +1 test → 37)
+- V0: 0 crit / 0 high / 2 med resueltos / 3 low abiertos (L-4 L-5 L-6)
+- V1: 0 crit / 2 med resueltos (M-3 race TOCTOU con test de socket crudo, M-4 docs) / L-7 resuelto / L-8 L-9 abiertos
+- Rounds de rework: 2 + 1 fix de feedback directo del Negocio
 
 ## Bloqueos
-- Escalados: 0 · Resueltos in-situ: 3 menores (glob tests Windows, gitleaks PATH ×2, quoting PowerShell)
-- 1 sesión de build muerta por usage limit (S06) — recuperada por auditoría+re-verificación; lección L-02
+- 0 escalados · 1 sesión muerta por usage limit (recuperada) · L-03 (DB compartida demo/smoke) resuelto estructuralmente con BREACHLAB_DB
 
 ## Riesgo residual
-- Browser real del visitante no testeado con clicks (verificado por composición HTTP 1:1 + estructura DOM por curl). Sandbox aislado verificado por netstat+grep. Portabilidad Linux/Mac no verificada en máquina real.
+- Render DOM en browser real no automatizado (verificado por contrato HTTP + strings servidos) · portabilidad Linux/Mac sin máquina real · CI: primer run en GitHub al cierre de este scorecard
 
-## Próximo (aprobado en G2)
-S07 CI + identidad + publicación prep → S08 V1 (guiado + reinicio + escenario scope) → S09 V2 (serie + export)
+## Estado final
+Roadmap V0/V1/V2 completo. Deuda menor declarada: L-4 L-5 L-6 L-8 L-9 (ninguna toca AC).
+

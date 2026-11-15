@@ -44,7 +44,9 @@ async function withServer(t) {
   await post('/api/lab/attack', { action: 'start' });
   for (let i = 0; i < 32; i++) await fetch(`${base}/api/entries`, { headers: { 'x-api-key': KEY } }); // umbral (patrón S03)
   await until(async () => ((await timeline()).some((e) => e.kind === 'alert') ? 1 : null), 5000, 'alerta');
-  assert.ok((await state()).db.garbage >= 1);
+  // Los 32 fetch de arriba son GETs (solo inflan el detector): la basura llega con el
+  // primer POST del bot — en runners lentos puede llegar después de la alerta. Poll.
+  await until(async () => (((await state()).db.garbage >= 1) ? 1 : null), 5000, 'garbage >= 1 (primer POST del bot)');
 
   const res = await fw('kill-switch', { enabled: true });
   assert.equal(res.status, 200);
