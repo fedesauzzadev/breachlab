@@ -1,0 +1,89 @@
+[server] [breachlab] http://127.0.0.1:3987 — sandbox local · acto 1 (normal)
+server up: true
+--- FASE 1: fuzz POST /api/entries ---
+PASS sin body, CT json -> 400 (esperado 400)
+PASS JSON malformado (syntax) -> 400 (esperado 400)
+PASS body vacio crudo -> 400 (esperado 400)
+PASS array -> 400 (esperado 400)
+PASS string JSON -> 400 (esperado 400)
+PASS numero -> 400 (esperado 400)
+PASS null JSON -> 400 (esperado 400)
+PASS objeto vacio {} -> 400 (esperado 400)
+PASS solo title -> 400 (esperado 400)
+PASS solo body -> 400 (esperado 400)
+PASS campo extra -> 400 (esperado 400)
+PASS title numerico -> 400 (esperado 400)
+PASS title null -> 400 (esperado 400)
+PASS title vacio -> 400 (esperado 400)
+PASS body vacio -> 400 (esperado 400)
+PASS title 80 chars (borde OK) -> 201 (esperado 201)
+PASS title 81 chars -> 400 (esperado 400)
+PASS body 280 chars (borde OK) -> 201 (esperado 201)
+PASS body 281 chars -> 400 (esperado 400)
+PASS title 10 KB -> 400 (esperado 400)
+PASS body 200 KB (>limite 100kb) -> 400 (esperado 400)
+OBS strings unicode/bidi caen en la misma regla 1..280 (por diseno): 201
+PASS CT text/plain con JSON -> 400 (esperado 400)
+PASS CT json charset utf-16 -> 400 (esperado 400)
+PASS sin CT -> 400 (esperado 400)
+PASS GET /api/entries valido -> 200 (esperado 200)
+PASS PUT /api/entries -> 404 (esperado 404)
+PASS DELETE /api/entries -> 404 (esperado 404)
+--- FASE 1b: fuzz /api/lab/* ---
+PASS attack action=1 -> 400 (esperado 400)
+PASS action="START" -> 400 (esperado 400)
+PASS action=null -> 400 (esperado 400)
+PASS attack body array -> 400 (esperado 400)
+PASS attack JSON malformado -> 400 (esperado 400)
+PASS kill-switch enabled="true" -> 400 (esperado 400)
+PASS kill-switch enabled=1 -> 400 (esperado 400)
+PASS rate-limit max=-1 -> 400 (esperado 400)
+PASS rate-limit max=1001 -> 400 (esperado 400)
+PASS rate-limit window_ms=999 -> 400 (esperado 400)
+PASS rate-limit max="10" -> 400 (esperado 400)
+PASS hardening enabled=false -> 400 (esperado 400)
+PASS timeline since=abc -> 200 (esperado 200)
+PASS timeline since=-9999 -> 200 (esperado 200)
+PASS timeline since gigante -> 200 (esperado 200)
+PASS audit since=%FF -> 200 (esperado 200)
+PASS path inexistente -> 404 (esperado 404)
+PASS query gigante 8KB -> 200 (esperado 200)
+--- FASE 2: NFR-5 - rate-limit ON (10/10s) + rafaga 25 ---
+PASS rate-limit ON -> 200 (esperado 200)
+rafaga 25: 2xx=10 429=15 otro=0 Retry-After en 429: 15/15
+PASS NFR-5: exactamente 10 con 2xx -> 10 (esperado 10)
+PASS NFR-5: >=15 con 429 -> true (esperado true)
+PASS NFR-5: 0 codigos raros -> 0 (esperado 0)
+PASS NFR-5: Retry-After en todos los 429 -> 15 (esperado 15)
+--- FASE 3: matriz auth ---
+PASS sin key -> 401 -> 401 (esperado 401)
+PASS key mala -> 401 -> 401 (esperado 401)
+PASS rotate-key -> 200 (esperado 200)
+FAIL key vieja (revocada) -> 401 -> 429 (esperado 401)
+PASS kill-switch ON -> 200 (esperado 200)
+FAIL key disabled -> 403 -> 429 (esperado 403)
+FAIL GET con key disabled -> 403 -> 429 (esperado 403)
+PASS hardening ON -> 200 (esperado 200)
+FAIL post-hardening key disabled -> 403 -> 429 (esperado 403)
+--- FASE 4: raw sockets (HTTP malformado) ---
+garbage request -> respondio-cerro :: HTTP/1.1 400 Bad Request
+header x-api-key 16KB -> respondio-cerro :: HTTP/1.1 400 Bad Request
+header no-ASCII crudo -> respondio-cerro :: HTTP/1.1 400 Bad Request
+body truncado (CL miente) -> respondio-cerro
+URL 9KB -> respondio-cerro :: HTTP/1.1 400 Bad Request
+header x-api-key 16KB (CRLF) -> respondio :: HTTP/1.1 401 Unauthorized
+header unicode crudo (byte E9) -> respondio :: HTTP/1.1 401 Unauthorized
+body truncado (CL miente, CRLF) -> respondio
+path con HTML crudo -> respondio-cerro :: HTTP/1.1 400 Bad Request
+AUDIT endpoint contiene HTML crudo (XSS almacenado en panel): false
+audit ultima fila: {"id":2,"ts":"2026-11-15T13:42:50.447Z","key_masked":"k-ca…niÃ©","method":"GET","endpoint":"/api/entries","status":401,"reason":"invalid_api_key"}
+x-api-key 8KB via fetch -> 401 {"error":"invalid_api_key"}
+--- FASE 5: internals + aliveness ---
+bodies de error 4xx/5xx capturados: 7; con internals: 0
+aliveness tras bombardeo: {"status":"ok","db_entries":25,"act":5}
+stderr del server: 0 chunks
+==== RESUMEN: 55/59 expectativas OK ====
+FAILED: key vieja (revocada) -> 401 -> 429 (want 401)
+FAILED: key disabled -> 403 -> 429 (want 403)
+FAILED: GET con key disabled -> 403 -> 429 (want 403)
+FAILED: post-hardening key disabled -> 403 -> 429 (want 403)

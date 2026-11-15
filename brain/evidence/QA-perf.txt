@@ -1,0 +1,18 @@
+=== SERVER B (fresco): matriz auth exacta sin rate-limit ===
+PASS sin key -> 401 -> 401 (want 401)
+PASS key mala -> 401 -> 401 (want 401)
+PASS key valida -> 201 -> 201 (want 201)
+=== NFR-7: perf 50 samples ===
+GET /api/lab/state: n=50 mean=12.6ms p95=16.4ms max=17.2ms
+POST /api/entries:   n=50 mean=15.5ms p95=22.8ms max=26.4ms
+PASS NFR-7 p95 GET < 200ms -> true (want true)
+PASS NFR-7 p95 POST < 200ms -> true (want true)
+=== matriz auth (cont.): rotate/kill/harden ===
+PASS rotate-key -> 200 (want 200)
+PASS key vieja revocada -> 401 -> 401 (want 401)
+PASS kill-switch ON -> 200 (want 200)
+PASS key disabled -> 403 key_disabled -> 403 (want 403)
+PASS hardening ON -> 200 (want 200)
+PASS post-hardening disabled -> 403 -> 403 (want 403)
+RESUMEN: 11/11 OK
+pid 15352 RSS antes=63619072 despues=67973120

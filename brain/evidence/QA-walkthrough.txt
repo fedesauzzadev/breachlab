@@ -1,0 +1,26 @@
+[srv] [breachlab] http://127.0.0.1:3989 — sandbox local · acto 1 (normal)
+t+0.0s ACTO 1: health={"status":"ok","db_entries":12,"act":1}
+  leak servido: project=undefined note= key_prefix=sk_breachlab_demo_L...
+  timeline eventos iniciales: 6 (seguridad: 0)
+t+0.0s ACTO 2: attack start
+  t+2s: act=2 requests=7 garbage=7
+  netstat durante ataque (filtro :3989):
+   | TCP    127.0.0.1:3989         0.0.0.0:0              LISTENING       3012
+   | TCP    127.0.0.1:3989         127.0.0.1:55259        ESTABLISHED     3012
+   | TCP    127.0.0.1:3989         127.0.0.1:55260        ESTABLISHED     3012
+   | TCP    127.0.0.1:3989         127.0.0.1:55261        ESTABLISHED     3012
+   | TCP    127.0.0.1:55259        127.0.0.1:3989         ESTABLISHED     28540
+   | TCP    127.0.0.1:55260        127.0.0.1:3989         ESTABLISHED     28540
+   | TCP    127.0.0.1:55261        127.0.0.1:3989         ESTABLISHED     3012
+  sockets NO-loopback con ese puerto: 0
+t+8.5s ACTO 3: deteccion act=3 tras 8.5s de sesión (32 requests)
+  alerta: {"id":7,"ts":"2026-11-15T13:44:40.673Z","kind":"alert","severity":"critical","message":"Detección: anomalous volume · key sk_b…3a9c · 31 requests en 10 s"}
+t+8.5s ACTO 4: flags={"killswitch":true,"ratelimit":true,"hardening":false,"rotated":true} act=4
+  feed reciente: [201,201,201,201,201,201,201,201,201,201,201,201,201,201,403,403,403,403,403,403]
+  basura congelada al contener: 32 (pico detectado 32)
+  re-ataque: +15 requests · blocked=15 · basura nueva=0
+  feed re-ataque: [403,403,403,403,403,403,403,403,429,429,429,429,429,429,429,429,429,429,429,429]
+  audit filas post re-ataque: 4 · ultima: {"id":4,"ts":"2026-11-15T13:44:43.843Z","key_masked":"sk_b…3a9c","method":"POST","endpoint":"/api/entries","status":403,"reason":"key_disabled"}
+  estado final: act=5 storage=sha256 storage flags={"killswitch":true,"ratelimit":true,"hardening":true,"rotated":true}
+t+14.5s POSTMORTEM: 200 bytes=6827 tiene Timeline=true Root Cause=true
+==== WALKTHROUGH TOTAL: 14.5s (gate QA <= 300s) ====

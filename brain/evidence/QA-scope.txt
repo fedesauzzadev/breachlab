@@ -1,0 +1,6 @@
+antes: storage=plaintext current=sk_b…3a9c
+hardening (SIN rotar): 200
+despues: storage=sha256 current=sk_b…3a9c act=5
+POST con key filtrada (active, sin scope) -> 403 {"error":"insufficient_scope"} (esperado 403 insufficient_scope)
+GET con key filtrada post-hardening -> 200 (scope solo exigido en POST)
+audit filas: 1 ultima: {"id":1,"ts":"2026-11-15T13:44:06.807Z","key_masked":"sk_b…3a9c","method":"POST","endpoint":"/api/entries","status":403,"reason":"insufficient_scope"}

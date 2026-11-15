@@ -1,0 +1,45 @@
+netstat -ano durante ataque activo (PORT 3989)
+  TCP    127.0.0.1:3989         0.0.0.0:0              LISTENING       3012
+  TCP    127.0.0.1:3989         127.0.0.1:55259        ESTABLISHED     3012
+  TCP    127.0.0.1:3989         127.0.0.1:55260        ESTABLISHED     3012
+  TCP    127.0.0.1:3989         127.0.0.1:55261        ESTABLISHED     3012
+  TCP    127.0.0.1:55259        127.0.0.1:3989         ESTABLISHED     28540
+  TCP    127.0.0.1:55260        127.0.0.1:3989         ESTABLISHED     28540
+  TCP    127.0.0.1:55261        127.0.0.1:3989         ESTABLISHED     3012
+sockets NO-loopback: 0
+== NFR-3b: grep clientes HTTP salientes en codigo de producto ==
+attacker.js:43: const res = await fetch(`${att.baseUrl}/entries`, {
+panel.js:16: const s = await (await fetch('/api/lab/state')).json();
+panel.js:52: const { events } = await (await fetch(`/api/lab/timeline?since=${lastEventId}`)).json();
+panel.js:74: fetch('/api/lab/attack', {
+panel.js:85: const firewall = (name, body) => fetch(`/api/lab/firewall/${name}`, {
+panel.js:93: $('fw-harden').addEventListener('click', () => fetch('/api/lab/hardening', {
+panel.js:102: const { attempts } = await (await fetch(`/api/lab/audit?since=${lastAuditId}`)).json();
+panel.js:120: const cfg = await (await fetch('/leak/config.json')).json();
+== TODO/FIXME en entregable ==
+server.js:  // → 400 invalid_request sin internals; todo lo demás → 500 sin internals.
+entries.js:    // §2.1/§2.5: todo POST autenticado escribe; el kind lo da el flujo del lab —
+lab.js:  ['Bienvenida al laboratorio', 'Primer registro legítimo del seed. Todo normal por acá.'],
+attack.test.js:  assert.equal(s.attack.blocked, 0); // sin matafuegos todo pasa (S03)
+== .gitleaks.toml ==
+# Gitleaks â€” BreachLab (NFR-2, plan Â§3).
+# Las reglas por defecto se EXTIENDEN (useDefault): un secret real de terceros harÃ­a fallar el gate.
+# Allowlist Ãºnica: las keys falsas de la demo, prefijo propio sk_breachlab_demo_
+# (FAKE BY DESIGN â€” ADR D-0003 Â§4, visible en repo-sim/config.json y READMEs).
+title = "BreachLab â€” secrets gate (solo keys falsas allowlisted, FAKE BY DESIGN)"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Keys 100% falsas de la demo: prefijo propio, documentadas FAKE BY DESIGN"
+regexes = [
+  '''sk_breachlab_demo_\S*''',
+]
+== repo-sim/config.json ==
+{
+  "service": "breachlab-api",
+  "environment": "production-sim",
+  "api_key": "sk_breachlab_demo_LEAKED_7f3a9c",
+  "_note": "SIMULACION: config 'versionada' con la API key expuesta. DEMO EDUCATIVA â€” key 100% FALSA (by design)."
+}

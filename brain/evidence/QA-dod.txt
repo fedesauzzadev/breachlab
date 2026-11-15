@@ -1,0 +1,26 @@
+﻿== DoD vendible (verificado 2026-11-15 10:47) ==
+GET /            -> 200 text/html; charset=utf-8 bytes=5733
+GET /panel.js    -> 200 text/javascript bytes=6200
+GET /docs/postmortem.md -> 200 bytes=6874
+GET /nope        -> 404 {error:not_found} · headers SIN x-powered-by, SIN Server, SIN versiones
+id [attack-start] presente: True
+id [attack-stop] presente: True
+id [fw-kill] presente: True
+id [fw-rotate] presente: True
+id [fw-rate] presente: True
+id [fw-harden] presente: True
+id [leak-btn] presente: True
+id [timeline] presente: True
+id [audit] presente: True
+id [feed] presente: True
+id [alert] presente: True
+id [state] presente: True
+id [garbage] presente: True
+id [key-storage] presente: True
+id [key-current] presente: True
+README.md: 2 comandos (npm install + npm start) + 5 actos + security notes + troubleshooting + link ES
+README.es.md: espejo (2 comandos, actos, nota seguridad, troubleshooting, link EN)
+LICENSE: MIT (2026 BreachLab contributors)
+CHANGELOG.md: 0.1.0 2026-11-14, features por slice S01..S06 (Keep a Changelog + SemVer)
+package.json version 0.1.0 + engines node>=24
+TODO/FIXME reales (case-sensitive): 0 (4 matches eran 'todo' en comentarios ES)
