@@ -67,10 +67,13 @@ Criticos: 0.
 
 MEDIOS:
 - M-3 - TOCTOU en POST /api/lab/reset: requests autenticados antes del reset aterrizan despues del re-seed (auth por headers, insert por body; el settle de 350 ms no cubre clientes de body lento/colado). Repro deterministica con socket crudo (201 Created + fila legit id 13 + health 13 en act 1) y probabilistica con spray (5/92 markers). No alcanzable por el flujo del producto; estado resultante valido pero incumple "seed restaurado exacto". Fix ~5 lineas (epoch check en el handler de entries) + test. Evidencia: QA-v1-reset-race.txt P6/P6b.
+  **RESUELTO 2026-11-15, commit d7a30da** (rework QA V1): epoch del lab estampada en la auth (`req.authEpoch`), POST /api/entries rechaza `409 stale_write` si el reset cambio la epoch. Repro P6 y spray de 20 sockets pre-fix: 201 + fila colada + health 13/32; post-fix: 409 + 0 sobrevivientes + health 12/act 1 (mismo script). Test de la race en suite (43/43). Evidencia: rework-QA-v1-race.txt, rework-QA-v1-suite.txt.
 - M-4 - DoD del incremento: CHANGELOG sin entrada V1, version sin bump (0.1.0), READMEs sin mencionar modo guiado/reset/escenario 2. No mienten, pero el incremento no es vendible como version. Fix ~15 min.
+  **RESUELTO 2026-11-15, commit d7a30da**: CHANGELOG 0.2.0 (S08: guided mode, reset, scenario 2), package.json 0.2.0, README EN/ES con las 3 features (modo guiado = forma recomendada para reclutadores).
 
 BAJOS:
 - L-7 - /api/lab/reset y /scenario/scopeless-key aceptan bodies sin content-type o text/plain como "vacio" (reset destructivo ejecuta 200 con body raw no-JSON). Patron heredado de rotate-key; NFR-1 a la letra pide validar tipo en todo POST. Fix: rechazar content-type != application/json.
+  **RESUELTO 2026-11-15, commit d7a30da** (incidental al rework M-3, middleware de 5 lineas en /api/lab): todo POST de la consola sin content-type o con text/plain -> 400 invalid_request; JSON roto sigue en 400. Verificado en smoke (rework-QA-v1-suite.txt). No aplica a /api/entries (su cadena apikey->validacion ya rechaza bodies no-JSON parseables como invalid_request antes de escribir).
 - L-8 - Timeline/audit congelado para consumidores que no rearmen cursores tras un reset externo (ids vuelven a 1; ?since=6 -> 0). El panel rearma solo en su propio click. Fix opcional: epoch de reset en /state y rearme automatico del panel al verlo cambiar.
 - L-9 - (pre-existing S03, fuera del delta) recordHit baja act de 5 a 3 ante flood de 35 GETs validos sin rate limit (verificado: act=5 -> 35 GETs -> act=3 + alerta post-hardening). Solo alcanzable con flood manual deliberado. Fix opcional: no degradar act si act >= 4.
 
