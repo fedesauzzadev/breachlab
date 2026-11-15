@@ -17,6 +17,12 @@
 - Intentos: arranque directo (falla por lock), localizar proceso.
 - Resolución: matar el huérfano, smoke con puerto propio, demo renacida después.
 - Lección: verificación funcional siempre con PORT efímero/propio; el server de demo es desechable y se reinicia al final, no se protege durante builds.
+
+## L-05 — Tests con timing real en CI de 2 cores: dos modos de falla, una cura
+- Qué pasó: el runner windows-latest (2 cores, archivos de test en paralelo) rompió dos veces tests que localmente pasaban: (1) starvation — el bot a 4 rps no sostiene la tasa bajo contención y la ventana de detección 30/10s nunca se llena (presupuesto mayor NO lo salva: es matemático); (2) ECONNRESET — churn de sockets en loopback bajo carga resetea conexiones.
+- Intentos: subir presupuesto (inútil para (1)); bombeo sin pacear (causó (2)).
+- Resolución: triple capa — (a) tests cruzan umbrales con POSTs directos determinísticos (patrón S03), el bot queda como parte narrativa; (b) bombeo paceado 20 ms + 1 retry ante error de red; (c) `--test-concurrency=2` en los scripts de test para bajar la contención.
+- Lección: en CI de 2 cores, ningún test debe depender de sostener una tasa por tiempo (timers bajo contención mienten). Umbral por bombeo directo + pacing + concurrency cap. Verificado verde en los 3 OS (run 43756022095).
 - UPDATE 2026-11-15 (post-V2): L-03 mató la demo del Negocio OTRA VEZ (smoke de S09 compartió data/breachlab.db → lock → demo murió). Fix estructural aplicado: `server.js` acepta `BREACHLAB_DB` (env) para DB propia por proceso — TODO smoke/walkthrough DEBE setear `BREACHLAB_DB` a un tmp propio. Regla fábrica: jamás correr un proceso del repo contra data/breachlab.db salvo la demo.
 
 ## L-04 — git stash/pop con autocrlf=true convierte LF→CRLF y rompe el validador del brain
