@@ -1,0 +1,45 @@
+# S09a — N-0007: serie de labs (2 vectores nuevos de filtración)
+Fecha: 2026-11-15 · HEAD previo: d00cd25 (v0.2.1) · Node v24.19.0
+
+## Qué se corrió (verificación real)
+
+1. `npm ci` → ok (express 5.1, lockfile intacto).
+2. `npm test` → **51/51 pass, 0 fail** (47 preexistentes + 4 nuevos de s09a.test.js).
+   Tests nuevos:
+   - N-0007 AC1: catálogo GET /api/lab/scenarios (3 vectores, leak_url únicas, fronteras
+     404 vector desconocido / 400 body extra).
+   - N-0007 AC2 x2 (server-log, frontend-bundle): selección → state.scenario correcto →
+     seed 12/0 acto 1 con SU key (label leaked-server-log / leaked-frontend-bundle) →
+     evidencia del leak 200 y contiene la key → narración warning exacta en timeline →
+     ataque → detección acto 3 con basura ≥30 → matafuegos + hardening → re-ataque
+     rebota auditado (milestone reattack_bounced) → 0 basura nueva → reset re-narra el
+     vector activo (no vuelve a la base).
+   - Base intacta: vuelta a repo-config → timeline de 6 eventos exactos (S08 sin regresión).
+3. Walkthrough server efímero (PORT=4001, proceso propio, muerto al final):
+   - GET /api/lab/scenarios → 3 vectores con name/origin/leak_url/leak_kind.
+   - POST /api/lab/scenarios/server-log → {scenario, reset:true}.
+   - GET /leak/error.log → 200, contiene `API_KEY=sk_breachlab_demo_LOG_c41d7e`.
+   - Timeline acto 1: evento system/warning con la narración del vector.
+   - POST attack start → 10 s → state: act=3, garbage=39, requests=39, leaked_masked=sk_b…1d7e.
+   - stop → frozen=39 → kill-switch + rotate + hardening → re-attack 8 s →
+     **act=5 · garbage=39/39 (0 nueva) · blocked=20 · audit=20 (todos key_disabled,
+     máscara sk_b…1d7e) · storage=sha256**.
+   - Timeline registra: "Detección: anomalous volume · key sk_b…1d7e · 31 requests en 10 s"
+     y "El atacante dejó de intentar (20 rebotes consecutivos) · 20 bloqueados en total".
+4. gitleaks (ruta absoluta L-01): `scanned ~385526 bytes in 174ms — no leaks found`.
+
+## Notas
+- Mojibake en salidas de PowerShell = encoding de consola (cosmético, archivos UTF-8;
+  mismo fenómeno que L-06).
+- public/leak/legacy-bundle.js contiene `fetch(` client-side al igual que panel.js
+  (código de navegador simulado, no IO saliente del proceso server — NFR-3 aplica a src/).
+- Primer intento de walkthrough con curl.exe falló por quote-mangling de PowerShell
+  (body JSON inválido → 400): reintento con Invoke-RestMethod. Segundo intento murió por
+  EADDRINUSE transitorio del puerto 3999 tras force-kill: puerto fresco 4001.
+
+## AC cubiertas
+- N-0007 AC1 (elegir escenario desde el panel): selector en index.html poblado por
+  GET /api/lab/scenarios, sync por /state.scenario. ✓ (API verificada por test+walkthrough;
+  render del selector es vanilla directo sobre ese contrato).
+- N-0007 AC2 (ciclo completo con narración propia por vector): verificado por test de
+  ciclo completo x2 vectores + walkthrough server-log end-to-end.

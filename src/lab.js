@@ -4,15 +4,12 @@ const { mkdirSync, readFileSync, rmSync } = require('node:fs');
 const path = require('node:path');
 const { createHash, randomBytes } = require('node:crypto');
 const { DatabaseSync } = require('node:sqlite');
+const { SCENARIOS } = require('./scenarios');
 
 const SEED_LEGIT_ENTRIES = 12; // D-0004: cantidad fija y documentada
 const SEED_TRAFFIC_EVENTS = 5; // timeline acto 1: tráfico legítimo del seed
-
-// El leak vive SOLO en el artefacto repo-sim/config.json (ADR D-0003 §6):
-// el seed lee la key de ahí; jamás hardcodeada en código.
-const leakedKey = JSON.parse(
-  readFileSync(path.join(__dirname, '..', 'repo-sim', 'config.json'), 'utf8')
-).api_key;
+// S09 (N-0007): el leak ya no es una sola key — cada vector de filtración trae la suya
+// (definidas como literales en src/scenarios.js, jamás hardcodeadas acá).
 
 const SEED_ENTRIES = [
   ['Bienvenida al laboratorio', 'Primer registro legítimo del seed. Todo normal por acá.'],
@@ -91,6 +88,10 @@ function createLab({ file } = {}) {
   const dbFile = file || path.join(__dirname, '..', 'data', 'breachlab.db');
   mkdirSync(path.dirname(dbFile), { recursive: true });
   const db = openDb(dbFile);
+  // S09 (N-0007): vector de filtración ACTIVO — arranca en la base histórica y lo
+  // cambia el selector del panel (labroutes → useScenario). Todo el lab (seed, kill
+  // switch, hardening) opera sobre la key de ESTE vector.
+  let scenario = SCENARIOS['repo-config'];
 
   const insEntry = db.prepare(
     'INSERT INTO entries(kind, title, body, created_at) VALUES (?, ?, ?, ?)');
@@ -107,20 +108,25 @@ function createLab({ file } = {}) {
     }
     // Exactamente 1 key en seed (contrato §2.4); key_plain = mala práctica visible (S05 migra a sha256).
     // Status active: la key del leak FUNCIONA.
-    insKey.run('leaked-repo-config', leakedKey, new Date(base).toISOString());
+    insKey.run(scenario.dbLabel, scenario.key, new Date(base).toISOString());
     // Timeline acto 1: 1 evento system + tráfico legítimo. CERO eventos de seguridad (AC2).
     insEvent.run(new Date(base).toISOString(), 'system', 'info',
       `Sandbox iniciada · ${SEED_LEGIT_ENTRIES} registros legítimos · acto 1 (normal)`);
+    // S09 (N-0007): los vectores nuevos narran SU historia en el timeline del acto 1
+    // (warning ámbar — la bomba ya plantada). La base no agrega nada (relato S01 intacto).
+    if (scenario.narration) {
+      insEvent.run(new Date(base + 500).toISOString(), 'system', 'warning', scenario.narration);
+    }
     for (let i = 1; i <= SEED_TRAFFIC_EVENTS; i++) {
       insEvent.run(new Date(base + i * 1000).toISOString(), 'traffic', 'info',
-        `GET /api/entries · 200 · key ${maskKey(leakedKey)}`);
+        `GET /api/entries · 200 · key ${maskKey(scenario.key)}`);
     }
   };
   seed();
   // State runtime: actos 1..5 (D-0004). currentMasked: la máscara vigente se guarda acá
   // porque con storage sha256 no se puede re-derivar desde la DB (S05). epoch: generación
   // del estado (M-3, QA V1) — la suma el reset para invalidar escrituras pre-reset.
-  const state = { act: 1, currentMasked: maskKey(leakedKey), epoch: 0 };
+  const state = { act: 1, scenarioId: 'repo-config', currentMasked: maskKey(scenario.key), epoch: 0 };
 
   const api = {
     db,
@@ -135,12 +141,12 @@ function createLab({ file } = {}) {
       db.prepare('SELECT id, ts, key_masked, method, endpoint, status, reason FROM audit WHERE id > ? ORDER BY id')
         .all(since),
     maskKey,
-    // S04 matafuegos (§2.5): acciones sobre la key COMPROMETIDA — el leak del artefacto repo-sim.
+    // S04 matafuegos (§2.5): acciones sobre la key COMPROMETIDA — la del vector activo.
     killSwitch: () => {
       // Post-hardening el plain ya no existe: matchea también por hash (§2.5).
       db.prepare("UPDATE api_keys SET status = 'disabled' WHERE key_plain = ? OR key_hash = ?")
-        .run(leakedKey, sha256Hex(leakedKey));
-      return maskKey(leakedKey);
+        .run(scenario.key, sha256Hex(scenario.key));
+      return maskKey(scenario.key);
     },
     rotateKey: () => {
       // La "key vieja" es la activa vigente (leaked o rotación previa) → revoked.
@@ -168,21 +174,26 @@ function createLab({ file } = {}) {
       const upd = db.prepare(
         'UPDATE api_keys SET key_hash = ?, key_plain = NULL, scope = ? WHERE id = ?');
       for (const r of rows) {
-        const legit = r.status === 'active' && r.key_plain !== leakedKey;
+        const legit = r.status === 'active' && r.key_plain !== scenario.key;
         upd.run(sha256Hex(r.key_plain), legit ? 'write:entries' : null, r.id);
         if (legit) state.currentMasked = maskKey(r.key_plain);
       }
       return rows.length;
     },
+    // S09 (N-0007): cambia el vector de filtración activo — el próximo reset()/seed
+    // siembra la key de ESTE vector. La validación del id la hace la ruta (404 antes).
+    useScenario(id) { scenario = SCENARIOS[id]; state.scenarioId = id; },
+    leakKey: () => scenario.key,
     // S08 (N-0005): reinicio del incidente SIN reiniciar el proceso — vuelve al acto 1
-    // exacto: seed restaurado (12 legit + key original activa en plaintext), timeline y
-    // audit limpios (ids desde 1), flags y contadores en cero.
+    // exacto: seed restaurado (12 legit + key del VECTOR ACTIVO en plaintext), timeline y
+    // audit limpios (ids desde 1), flags y contadores en cero. El vector NO se toca:
+    // "Reiniciar incidente" re-narra el mismo leak (S09).
     reset() {
       state.epoch += 1; // M-3 (QA V1): primera — nada autenticado antes del reset escribe después
       db.exec('DELETE FROM entries; DELETE FROM events; DELETE FROM api_keys; DELETE FROM audit;');
       seed();
       state.act = 1;
-      state.currentMasked = maskKey(leakedKey);
+      state.currentMasked = maskKey(scenario.key);
       state.attack = { running: false, requests: 0, blocked: 0, recent: [] };
       state.flags = { killswitch: false, ratelimit: false, hardening: false, rotated: false };
     },

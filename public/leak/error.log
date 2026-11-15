@@ -1,0 +1,13 @@
+[breachlab-api] 2026-11-02T03:12:44.518Z ERROR unhandledException · GET /api/entries
+TypeError: Cannot read properties of undefined (reading 'id')
+    at serializeEntries (file:///srv/api/src/entries.js:88:17)
+    at Layer.handleRequest (file:///srv/api/node_modules/express/lib/router/layer.js:95:5)
+    at next (file:///srv/api/node_modules/express/lib/router/route.js:149:13)
+    at done (file:///srv/api/src/entries.js:41:7)
+--- environment dump (adjuntado al ticket #4712) ---
+NODE_ENV=production-sim
+DATABASE_URL=sqlite:///srv/data/breachlab.db
+API_KEY=sk_breachlab_demo_LOG_c41d7e
+
+# SIMULACIÓN: log de errores con dump de entorno, "adjuntado al ticket #4712" y que
+# quedó accesible desde afuera. Key 100% FALSA (FAKE BY DESIGN) — demo educativa BreachLab.

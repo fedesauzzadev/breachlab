@@ -2,16 +2,11 @@
 // Consola del defensor /api/lab/* (contrato §2.4): state, timeline y control del ataque.
 // Sin key: solo existe en loopback (ADR D-0003). Números: ADR D-0004.
 const express = require('express');
-const { readFileSync } = require('node:fs');
-const path = require('node:path');
 const { randomBytes } = require('node:crypto');
 const { maskKey, sha256Hex } = require('./lab');
+const { SCENARIOS, scenarioList } = require('./scenarios');
 const { DETECTION_MAX_REQUESTS, DETECTION_WINDOW_MS, ALERT_COOLDOWN_MS } = require('./apikey');
 const { BOT_INTERVAL_MS, SCENARIO_BURST } = require('./attacker');
-
-// La máscara del leak sale del ARTEFACTO (el leak nunca vive en código — ADR D-0003 §6).
-const leakedKey = JSON.parse(
-  readFileSync(path.join(__dirname, '..', 'repo-sim', 'config.json'), 'utf8')).api_key;
 
 function createLabRoutes(lab, attacker, rateLimiter, auth = null) {
   const router = express.Router();
@@ -34,11 +29,14 @@ function createLabRoutes(lab, attacker, rateLimiter, auth = null) {
     const current = activeKey.get();
     const a = lab.state.attack;
     const f = lab.state.flags;
+    // S09 (N-0007): el vector activo — el panel arma el selector y el visor del leak.
+    const sc = SCENARIOS[lab.state.scenarioId];
     res.json({
       act: lab.state.act,
       attack: a,
       db: counts,
       flags: f,
+      scenario: { id: lab.state.scenarioId, name: sc.name, origin: sc.origin, leak_url: sc.leakUrl, leak_kind: sc.leakKind },
       // S08 modo guiado (N-0005): hitos derivados SOLO de estado runtime — nada nuevo en DB.
       milestones: {
         attack_started: lab.state.act >= 2,
@@ -48,7 +46,7 @@ function createLabRoutes(lab, attacker, rateLimiter, auth = null) {
         reattack_bounced: !!(f.hardening && a.blocked > (a.reattackBase ?? Infinity)),
       },
       keys: {
-        leaked_masked: maskKey(leakedKey),
+        leaked_masked: maskKey(lab.leakKey()), // la del vector activo (S09)
         // Con hardening el plain no existe: la máscara se guardó al migrar/rotar (lab.js).
         current_masked: lab.state.flags.hardening
           ? lab.state.currentMasked
@@ -70,13 +68,14 @@ function createLabRoutes(lab, attacker, rateLimiter, auth = null) {
     res.json({ events: lab.listEvents(Number.isInteger(since) ? since : 0) });
   });
 
-  // Control del bot atacante (AC1/AC4 de N-0002).
+  // Control del bot atacante (AC1/AC4 de N-0002). S09: el arranque SIEMPRE recibe la
+  // key del vector activo — el ataque y el re-ataque cuentan la historia del leak elegido.
   router.post('/attack', (req, res) => {
     const action = req.body && req.body.action;
     if (action !== 'start' && action !== 'stop') {
       return res.status(400).json({ error: 'invalid_request', details: 'action debe ser "start" o "stop"' });
     }
-    if (action === 'start') attacker.start();
+    if (action === 'start') attacker.start(lab.leakKey());
     else attacker.stop();
     res.status(202).json({ running: lab.state.attack ? lab.state.attack.running : false });
   });
@@ -139,22 +138,50 @@ function createLabRoutes(lab, attacker, rateLimiter, auth = null) {
     res.json({ hardening: true, keys_hashed });
   });
 
-  // S08 (N-0005): reinicio del incidente SIN reiniciar el proceso — vuelve al acto 1
-  // exacto: seed restaurado, timeline/audit limpios, flags y contadores en cero.
-  router.post('/reset', async (req, res) => {
-    const b = req.body;
-    if (b !== undefined && (typeof b !== 'object' || Array.isArray(b) || Object.keys(b).length > 0)) {
-      return bad(res, 'body vacío {} — sin campos extra');
-    }
+  // Coreografía completa de reinicio (S08 /reset + S09 cambio de vector): frena el bot,
+  // deja aterrizar los POST en vuelo, limpia rate limit y detector, y re-sembra el seed.
+  const fullReset = async () => {
     attacker.reset();
-    // Deja terminar los POST en vuelo del bot antes de limpiar: si no, un insert ya
-    // autenticado podría aterrizar en la DB recién re-seedeada.
     await new Promise((r) => setTimeout(r, BOT_INTERVAL_MS + 100));
     rateLimiter.cfg.enabled = false;
     rateLimiter.configure(); // ventanas limpias
     if (typeof auth.reset === 'function') auth.reset(); // detector: hits y cooldown a cero
     lab.reset();
+  };
+
+  // S08 (N-0005): reinicio del incidente SIN reiniciar el proceso — vuelve al acto 1
+  // exacto del VECTOR ACTIVO: seed restaurado, timeline/audit limpios, flags en cero.
+  router.post('/reset', async (req, res) => {
+    const b = req.body;
+    if (b !== undefined && (typeof b !== 'object' || Array.isArray(b) || Object.keys(b).length > 0)) {
+      return bad(res, 'body vacío {} — sin campos extra');
+    }
+    await fullReset();
     res.json({ reset: true });
+  });
+
+  // S09 (N-0007): la serie de labs — el catálogo de vectores de filtración elegibles.
+  router.get('/scenarios', (_req, res) => {
+    res.json({ scenarios: scenarioList(), current: lab.state.scenarioId });
+  });
+
+  // Elegir un vector = reiniciar el incidente contado desde ESE leak: seed con SU key,
+  // SU narración en el timeline y SU evidencia bajo /leak/. El ciclo y los matafuegos
+  // son los mismos — la historia cambia.
+  router.post('/scenarios/:id', async (req, res) => {
+    if (!SCENARIOS[req.params.id]) {
+      return res.status(404).json({ error: 'not_found', details: 'vector de filtración desconocido' });
+    }
+    const b = req.body;
+    if (b !== undefined && (typeof b !== 'object' || Array.isArray(b) || Object.keys(b).length > 0)) {
+      return bad(res, 'body vacío {} — sin campos extra');
+    }
+    if (lab.state.attack && lab.state.attack.running) {
+      return bad(res, 'detenga el ataque antes de cambiar de vector');
+    }
+    lab.useScenario(req.params.id); // antes del reset: el seed siembra la key nueva
+    await fullReset();
+    res.json({ scenario: req.params.id, reset: true });
   });
 
   // S08 (N-0006) escenario 2: key auténtica y activa pero SIN scope de escritura — el

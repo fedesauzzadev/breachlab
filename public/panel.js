@@ -60,6 +60,12 @@
           `El atacante sigue probando — todo rebota (${s.attack.blocked} bloqueados). ` +
           'No sabe que su key murió; se rinde solo tras 20 rebotes consecutivos.';
       }
+      // S09 (N-0007): el vector activo llega por /state — selector y relato del origen
+      // siempre en sync (también tras un reset o un cambio hecho en otra pestaña).
+      if (s.scenario) {
+        $('scenario-select').value = s.scenario.id;
+        $('scenario-origin').textContent = s.scenario.origin;
+      }
       // S08: escenario 2 habilitado solo con hardening activo y ataque detenido.
       $('scenario-btn').disabled = !s.flags.hardening || s.attack.running;
       if (guidedOn) renderGuided(s);
@@ -136,13 +142,31 @@
     } catch { /* pollState ya reporta la desconexión */ }
   }
 
-  // El leak: la config "versionada" con la key falsa (AC4, FAKE BY DESIGN).
+  // El leak: la evidencia del VECTOR ACTIVO (S09) — config versionada, log expuesto o
+  // bundle del frontend, según el lab elegido. Key falsa (FAKE BY DESIGN).
   $('leak-btn').addEventListener('click', async () => {
     const pre = $('leak');
     if (!pre.hidden) { pre.hidden = true; return; }
-    const cfg = await (await fetch('/leak/config.json')).json();
-    pre.textContent = JSON.stringify(cfg, null, 2);
+    const sc = lastState && lastState.scenario;
+    const text = await (await fetch(sc ? sc.leak_url : '/leak/config.json')).text();
+    pre.textContent = sc && sc.leak_kind === 'json' ? JSON.stringify(JSON.parse(text), null, 2) : text;
     pre.hidden = false;
+  });
+
+  // S09 (N-0007): la serie — selector de vector. Cambiar = elegir otra historia: el
+  // server re-siembra con la key de ese vector y el panel rearma los cursores (los ids
+  // del timeline/audit vuelven a 1). El relato llega por polling (scenario.origin).
+  (async () => {
+    try {
+      const { scenarios } = await (await fetch('/api/lab/scenarios')).json();
+      $('scenario-select').replaceChildren(...scenarios.map((s) => new Option(s.name, s.id)));
+    } catch { /* el polling reintenta */ }
+  })();
+  $('scenario-select').addEventListener('change', (e) => {
+    fetch(`/api/lab/scenarios/${e.target.value}`, {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}',
+    }).catch(() => {});
+    clearIncident();
   });
 
   // S08 modo guiado (N-0005): los hitos llegan por /api/lab/state (milestones) — acá solo
@@ -170,20 +194,26 @@
     if (guidedOn && lastState) renderGuided(lastState);
   });
 
-  // S08 reinicio (N-0005): el server restaura el seed sin reiniciar el proceso; acá se
-  // rearman los cursores porque los ids del timeline/audit vuelven a arrancar en 1.
-  $('reset-btn').addEventListener('click', async () => {
-    try {
-      await fetch('/api/lab/reset', {
-        method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}',
-      });
-    } catch { /* el polling reintenta */ }
+  // S08/S09: rearma los cursores del panel tras reset o cambio de vector — los ids del
+  // timeline/audit vuelven a arrancar en 1.
+  const clearIncident = () => {
     lastEventId = 0;
     lastAuditId = 0;
     $('timeline').replaceChildren();
     $('audit').replaceChildren();
     $('alert').hidden = true;
     $('feed').hidden = true;
+    $('leak').hidden = true;
+  };
+
+  // S08 reinicio (N-0005): el server restaura el seed sin reiniciar el proceso.
+  $('reset-btn').addEventListener('click', async () => {
+    try {
+      await fetch('/api/lab/reset', {
+        method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}',
+      });
+    } catch { /* el polling reintenta */ }
+    clearIncident();
   });
 
   // S08 escenario 2 (N-0006): lanza el bot con una key válida sin scope de escritura.
