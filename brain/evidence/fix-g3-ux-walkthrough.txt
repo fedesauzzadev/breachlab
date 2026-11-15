@@ -1,0 +1,57 @@
+# Fix G3 (feedback Negocio) — walkthrough funcional + panel + gitleaks
+
+Fecha: 2026-11-15 · server efímero PORT=3987 (DB re-seedeada al arranque) · Node v24.19.0
+
+Feedback literal del Negocio: "Cuando aprieto sin scope, sigue enviando peticiones que dan
+error, no frenan ni hay botón para frenar. Y lo mismo con la primera amenaza: si no pones
+frenar amenaza, aunque hagas kill switch y cambio de key, sigue tirando peticiones sin parar."
+
+## 1. Walkthrough por HTTP real (rendición + ráfaga finita)
+
+[walkthrough] target http://127.0.0.1:3987
+[1] inicio: act=1 running=false reqs=0 blocked=0 db=12/0
+[2] POST /api/lab/attack {"action":"start"} → [ 202, { running: true } ]
+[3] ataque corriendo (todo 201): act=2 running=true reqs=11 blocked=0 db=12/11 feed=201,201,...,201
+[4] POST /api/lab/firewall/kill-switch → [ 200, { killswitch: true } ]
+[5] rendición tras 5.1 s: act=2 running=false reqs=31 blocked=20 db=12/11
+[6] timeline: Kill switch ON · key sk_b…3a9c deshabilitada · cada request con esa key → 403
+[6] timeline: El atacante dejó de intentar (20 rebotes consecutivos) · 20 bloqueados en total
+[7] sin proceso residual (reqs congelados): act=2 running=false reqs=31 blocked=20 db=12/11
+[8] POST /api/lab/hardening → [ 200, { hardening: true, keys_hashed: 1 } ]
+[9] POST /api/lab/scenario/scopeless-key → [ 202, { scenario: 'scopeless-key',
+     running: true, key_masked: 'sk_b…7d80', requests_planned: 10 } ]
+[10] escenario solo (auto-stop): act=5 running=false reqs=41 blocked=30 db=12/11 — delta requests = 10
+[11] timeline: Escenario 2 · key sk_b…7d80 válida y activa pero SIN scope write:entries · sus POST → 403
+[11] timeline: Escenario 2 completado · 10 intentos · 10 rechazados (403 insufficient_scope) · 0 escrituras
+[12] audit del escenario: 10 filas · statuses=403 · reasons=insufficient_scope
+[walkthrough] OK
+
+Lectura contra el contrato G3:
+- Ataque exitoso (201s): 11 requests y NO se auto-detiene (AC1 N-0002 intacta).
+- Kill switch: el bot sigue probando ~5 s (rebota 20 veces) y SE RINDE solo → evento exacto.
+- Sin proceso residual: reqs queda congelado en 31 tras la rendición.
+- Escenario: 202 con requests_planned 10, delta EXACTO de 10 requests, auto-stop,
+  evento exacto "…· 10 intentos · 10 rechazados (403 insufficient_scope) · 0 escrituras",
+  audit = 10 filas todas 403 insufficient_scope, DB 12/11 (0 escrituras nuevas).
+
+## 2. Panel (FIX-3) — verificado sobre el HTML/JS servido
+
+bot-status node: true                    (index.html contiene <p id="bot-status">)
+texto ataque nuevo: true                 ("…se rinde tras 20 rechazos consecutivos")
+boton escenario rafaga 10: true          ("Escenario: key sin scope (ráfaga de 10)")
+nota pedagogica: true                    ("…el bot se detiene solo al terminar")
+panel.js estado rebotes: true            ("El atacante sigue probando — todo rebota (N bloqueados)")
+panel.js nota key muerta: true           ("No sabe que su key murió; se rinde solo tras 20 rebotes consecutivos")
+
+El botón "Detener ataque" se habilita con attack.running (flag único que cubre ataque Y
+escenario — el escenario lo levanta): siempre disponible mientras algo corre.
+
+## 3. gitleaks por ruta absoluta (L-01)
+
+"C:/Users/hp/AppData/Local/Microsoft/WinGet/Packages/Gitleaks.Gitleaks_Microsoft.Winget.Source_8wekyb3d8bbwe/gitleaks.exe"
+detect --source C:/repos/breachlab --no-git -c .gitleaks.toml
+→ scanned ~358355 bytes in 416ms · no leaks found · exit 0
+
+## 4. Constantes del contrato (src/attacker.js)
+
+BOT_GIVEUP_STREAK = 20 · SCENARIO_BURST = 10 (afirmado por los asserts del test nuevo).

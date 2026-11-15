@@ -104,8 +104,13 @@ test('the full incident in 5 acts (e2e regression)', async (t) => {
     assert.notEqual(s4.keys.current_masked, s4.keys.leaked_masked); // new key ≠ leaked key
   });
 
-  await t.test('act 5 — hardening + re-attack: bounces, 0 new garbage, all audited', async () => {
+  await t.test('act 5 — hardening + re-attack: bounces audited, 0 new garbage, attacker gives up', async () => {
     await labpost('/api/lab/attack', { action: 'stop' });
+    // The act-4 burst saturated the leaked key's limiter window: unaudited 429s would
+    // dominate the re-attack. Re-applying rate limit clears the buckets (defender action,
+    // BEFORE hardening so the act stays 5) — bounces reach auth, get audited, and the
+    // bot gives up after 20 in a row (ADR D-0006).
+    await labpost('/api/lab/firewall/rate-limit', { enabled: true });
     const hard = await labpost('/api/lab/hardening', { enabled: true });
     assert.equal(hard.status, 200);
     assert.deepEqual(await audit(), []); // act-4 rejections pre-hardening left no trace (§2.4)
@@ -115,18 +120,18 @@ test('the full incident in 5 acts (e2e regression)', async (t) => {
 
     await labpost('/api/lab/attack', { action: 'start' }); // RE-ATTACK with the leaked key
     const s5 = await until(async () => {
-      const a = await audit();
       const s = await state();
-      return a.length >= 3 && s.attack.recent.length > 0
-        && s.attack.recent.every((r) => r.status !== 201 && r.status !== 200) ? s : null;
-    }, 20000, 're-ataque rebotado y auditado');
-    await labpost('/api/lab/attack', { action: 'stop' });
+      return !s.attack.running && (await audit()).length >= 3 ? s : null;
+    }, 20000, 'rendición del re-ataque (20 rebotes consecutivos)');
 
     assert.equal(s5.db.garbage, frozen); // zero new garbage — the hardening proof
     assert.equal(s5.db.legit, SEED_LEGIT_ENTRIES);
     assert.equal(s5.act, 5);
     assert.equal(s5.keys.storage, 'sha256');
     assert.ok(s5.attack.recent.every((r) => [401, 403, 429].includes(r.status)));
+    const giveup = (await get('/api/lab/timeline')).events
+      .find((e) => e.message.startsWith('El atacante dejó de intentar'));
+    assert.ok(giveup, 'evento de rendición en timeline (ADR D-0006)');
     const audited = await audit();
     assert.ok(audited.length >= 3); // a row per blocked attempt that reached auth
     for (const r of audited) {

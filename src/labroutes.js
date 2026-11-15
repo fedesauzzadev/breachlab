@@ -7,7 +7,7 @@ const path = require('node:path');
 const { randomBytes } = require('node:crypto');
 const { maskKey, sha256Hex } = require('./lab');
 const { DETECTION_MAX_REQUESTS, DETECTION_WINDOW_MS, ALERT_COOLDOWN_MS } = require('./apikey');
-const { BOT_INTERVAL_MS } = require('./attacker');
+const { BOT_INTERVAL_MS, SCENARIO_BURST } = require('./attacker');
 
 // La máscara del leak sale del ARTEFACTO (el leak nunca vive en código — ADR D-0003 §6).
 const leakedKey = JSON.parse(
@@ -158,7 +158,8 @@ function createLabRoutes(lab, attacker, rateLimiter, auth = null) {
   });
 
   // S08 (N-0006) escenario 2: key auténtica y activa pero SIN scope de escritura — el
-  // bot la usa: sus POST rebotan 403 insufficient_scope auditados, la DB queda limpia.
+  // bot la usa en una RÁFAGA FINITA de 10 (FIX-1, ADR D-0006): sus POST rebotan 403
+  // insufficient_scope auditados, la DB queda limpia y el bot se detiene solo.
   router.post('/scenario/scopeless-key', (req, res) => {
     const b = req.body;
     if (b !== undefined && (typeof b !== 'object' || Array.isArray(b) || Object.keys(b).length > 0)) {
@@ -173,8 +174,8 @@ function createLabRoutes(lab, attacker, rateLimiter, auth = null) {
     const mask = maskKey(fresh);
     insAction.run(new Date().toISOString(),
       `Escenario 2 · key ${mask} válida y activa pero SIN scope write:entries · sus POST → 403`);
-    attacker.start(fresh);
-    res.status(202).json({ scenario: 'scopeless-key', running: true, key_masked: mask });
+    attacker.start(fresh, { burst: SCENARIO_BURST });
+    res.status(202).json({ scenario: 'scopeless-key', running: true, key_masked: mask, requests_planned: SCENARIO_BURST });
   });
 
   // Audit log (§2.4): intentos bloqueados con hardening activo; ?since=<id> incremental.

@@ -51,6 +51,15 @@
       feed.hidden = s.attack.recent.length === 0;
       feed.replaceChildren(...s.attack.recent.map((r) =>
         el('code', r.status >= 200 && r.status < 300 ? 'c2xx' : 'c4xx', r.status)));
+      // FIX-3 (feedback G3, ADR D-0006): estado explícito mientras corre y todo rebota.
+      // Pedagógico a propósito: el atacante no sabe que su key murió — sigue probando.
+      const bouncing = s.attack.running && s.attack.blocked > 0;
+      $('bot-status').hidden = !bouncing;
+      if (bouncing) {
+        $('bot-status').textContent =
+          `El atacante sigue probando — todo rebota (${s.attack.blocked} bloqueados). ` +
+          'No sabe que su key murió; se rinde solo tras 20 rebotes consecutivos.';
+      }
       // S08: escenario 2 habilitado solo con hardening activo y ataque detenido.
       $('scenario-btn').disabled = !s.flags.hardening || s.attack.running;
       if (guidedOn) renderGuided(s);

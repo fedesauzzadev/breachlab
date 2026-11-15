@@ -1,6 +1,6 @@
 {
   "name": "breachlab",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "private": true,
   "description": "BreachLab — sandbox 100% local de un incidente de API key filtrada. Demo educativa: vulnerable por diseño, aislada en 127.0.0.1, keys 100% falsas.",
   "engines": {

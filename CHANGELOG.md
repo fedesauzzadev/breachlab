@@ -3,6 +3,27 @@
 Format based on [Keep a Changelog](https://keepachangelog.com/); versioning follows
 [SemVer](https://semver.org/).
 
+## [0.2.1] — 2026-11-15
+G3 feedback fix: the attacker is no longer an endless loop.
+
+### Changed
+- **Attacker gives up (ADR D-0006).** After 20 consecutive bounces (any
+  non-2xx: 401/403/429), the bot stops on its own and the timeline narrates
+  `El atacante dejó de intentar (20 rebotes consecutivos) · N bloqueados en
+  total`. Any 2xx resets the streak, so a successful attack (201s) never
+  stops by itself — the act-2/3 story is unchanged.
+- **Scenario 2 is now a finite burst.** `POST /api/lab/scenario/scopeless-key`
+  fires exactly 10 requests (`requests_planned: 10` in the 202 response) and
+  the bot stops on its own, closing with a timeline event: `Escenario 2
+  completado · 10 intentos · 10 rechazados (403 insufficient_scope) · 0
+  escrituras`. No leftover process.
+- **Panel speaks while everything bounces.** While the bot runs and every
+  request bounces, the attack section shows "El atacante sigue probando —
+  todo rebota (N bloqueados)" with the pedagogical note (the attacker
+  doesn't know his key is dead). The stop button stays enabled for any
+  running bot (attack or scenario), and the scenario button labels its
+  10-request burst.
+
 ## [0.2.0] — 2026-11-15
 V1: the incident, narrated — guided mode, instant replay and a second scenario
 on top of the 5-act MVP.

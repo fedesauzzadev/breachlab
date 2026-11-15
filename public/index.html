@@ -70,7 +70,8 @@
 <section>
   <h2>Simulación de ataque</h2>
   <p class="warn">El bot interno usa la key filtrada del repo contra <code>POST /api/entries</code>
-     (4 req/s, todo por 127.0.0.1). No se detiene solo.</p>
+     (4 req/s, todo por 127.0.0.1). Mientras la API le responde 2xx no se detiene solo;
+     cuando todo rebota (kill switch, rotación), se rinde tras 20 rechazos consecutivos.</p>
   <button id="attack-start">Simular ataque</button>
   <button id="attack-stop" disabled>Detener ataque</button>
   <div class="stats">
@@ -80,6 +81,7 @@
   </div>
   <p id="alert" class="alert" hidden></p>
   <div id="feed" class="feed" hidden></div>
+  <p id="bot-status" class="warn" hidden></p>
 </section>
 
 <section>
@@ -104,9 +106,10 @@
      auditado). Es el <strong>principio de mínimo privilegio</strong>: si toda key nace con los
      scopes justos, una filtración futura no puede escribir — la blast radius queda acotada a lo
      que la key ya podía hacer.</p>
-  <button id="scenario-btn" disabled>Escenario: key sin scope</button>
+  <button id="scenario-btn" disabled>Escenario: key sin scope (ráfaga de 10)</button>
   <p class="warn">Requiere hardening activo · Detener el ataque antes de lanzarlo · El bot usa esa
-     key: mirá el audit log y el feed (todo 403, DB sin basura).</p>
+     key: mirá el audit log y el feed (todo 403, DB sin basura). Ráfaga finita: exactamente
+     10 intentos y el bot se detiene solo al terminar.</p>
 </section>
 
 <section>

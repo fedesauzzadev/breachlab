@@ -1,0 +1,43 @@
+# Fix G3 (feedback Negocio) — suite completa desde instalación limpia
+
+Fecha: 2026-11-15 · base HEAD 6e96268 · Node v24.19.0 · Windows (PowerShell)
+
+## Comandos
+
+$ npm ci
+found 0 vulnerabilities
+
+$ npm test
+tests 47 · pass 47 · fail 0 · duration_ms ~20.2s
+
+## Detalle del final de la corrida
+
+✔ la demo es re-jugable: el ataque vuelve a escribir basura con la key original (347.8ms)
+✔ N-0005 hitos del modo guiado avanzan con el incidente y el reset restaura el acto 1 sin reiniciar el proceso (10309.1ms)
+✔ N-0006 escenario 2: key válida sin scope — POST 403 insufficient_scope auditado, GET 200, DB limpia (1773.3ms)
+✔ M-3 TOCTOU del reset: POST autenticado pre-reset con body goteado rebota y no ensucia el seed (1156.4ms)
+ℹ tests 47
+ℹ suites 0
+ℹ pass 47
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 20204.056
+
+## Tests nuevos (test/g3-fix.test.js — 4: 2 top-level + 2 subtests)
+
+- FIX-1 escenario 2: ráfaga finita — exactamente 10, se frena solo, evento de cierre, 0 escrituras.
+- FIX-2 ataque exitoso: >20 requests con 201 y el bot sigue corriendo (AC1 N-0002 intacta).
+- FIX-2 kill switch → todo rebota → rendición tras 20 rebotes consecutivos con evento de timeline.
+
+Antes del fix: 43/43. Después: 47/47 (43 + 4 nuevos, 0 rotos).
+test/e2e.test.js acto 5 actualizado al contrato nuevo (rendición del re-ataque): el bot ya no
+dura para siempre, el test asumía el loop infinito que el Negocio reportó.
+
+## Nota ambiental
+
+Un server node viejo (código pre-fix, `npm start` 11:53, puerto 3000) compartía
+data/breachlab.db con el server efímero del walkthrough y contaminaba el audit log con sus
+propios 401s (su bot seguía en loop infinito — exactamente el bug reportado). Se mató antes
+de re-correr el walkthrough limpio (mismo criterio que S08 con el PID 25176).
