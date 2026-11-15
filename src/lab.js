@@ -118,8 +118,9 @@ function createLab({ file } = {}) {
   };
   seed();
   // State runtime: actos 1..5 (D-0004). currentMasked: la máscara vigente se guarda acá
-  // porque con storage sha256 no se puede re-derivar desde la DB (S05).
-  const state = { act: 1, currentMasked: maskKey(leakedKey) };
+  // porque con storage sha256 no se puede re-derivar desde la DB (S05). epoch: generación
+  // del estado (M-3, QA V1) — la suma el reset para invalidar escrituras pre-reset.
+  const state = { act: 1, currentMasked: maskKey(leakedKey), epoch: 0 };
 
   const api = {
     db,
@@ -177,6 +178,7 @@ function createLab({ file } = {}) {
     // exacto: seed restaurado (12 legit + key original activa en plaintext), timeline y
     // audit limpios (ids desde 1), flags y contadores en cero.
     reset() {
+      state.epoch += 1; // M-3 (QA V1): primera — nada autenticado antes del reset escribe después
       db.exec('DELETE FROM entries; DELETE FROM events; DELETE FROM api_keys; DELETE FROM audit;');
       seed();
       state.act = 1;

@@ -1,0 +1,28 @@
+# QA-v1 NFRs + DoD - 2026-11-15 - commit e027e82
+
+NFR-1 validacion endpoints nuevos (detalle en QA-v1-fuzz.txt):
+  reset/scenario con JSON basura (campo extra, array, string, numero, boolean, null, JSON roto, 10KB,
+  unicode hostil, deep nested): 100% -> 400 invalid_request; metodos equivocados -> 404; traversal -> 404.
+  EXCEPCION L-7: body SIN content-type o text/plain se trata como vacio -> reset destructivo ejecuta 200
+  (patron pre-existing de rotate-key S04; reset es nuevo y destructivo).
+  Proceso VIVO al final del fuzz (health ok 12/act1).
+
+NFR-2 secrets: gitleaks 8.30.x por ruta absoluta (L-05/L-01):
+  "C:/Users/hp/AppData/Local/Microsoft/WinGet/Packages/Gitleaks.Gitleaks_Microsoft.Winget.Source_8wekyb3d8bbwe/gitleaks.exe"
+  detect --source C:/repos/breachlab --no-git -c .gitleaks.toml
+  INF scanned ~319387 bytes in 240ms - INF no leaks found - exit=0
+  (prefijo sk_breachlab_demo_ cubre las SCOPELESS_ del escenario; solo existen en memoria/DB gitignored)
+
+NFR-3 aislamiento: grep server-side de clientes HTTP (fetch|net.connect|http.request|axios|https.) en
+  src/*.js + server.js + test/*.js: unico fetch de producto es src/attacker.js:47 con URL loopback constante
+  (HOST='127.0.0.1' constante, setPort solo tests); el resto son tests contra servers efimeros.
+  Bind 127.0.0.1 en server.js:19 intacto. Gitleaks/labroutes no agregan IO saliente.
+
+NFR-8 deps: npm audit --omit=dev -> found 0 vulnerabilities (express 5.1.0 unica dep).
+
+DoD:
+  README.md / README.es.md: 0 menciones de modo guiado / reset / escenario / V1 (grep 0 matches)
+  CHANGELOG.md: ultima entrada 0.1.0 (V0/S06) - SIN entrada S08/V1
+  package.json: version 0.1.0 (sin bump)
+  TODO/FIXME case-insensitive en codigo: 0 reales (4 matches = palabra espanol "todo")
+  LICENSE MIT intacto.

@@ -1,0 +1,14 @@
+# QA-v1 suite limpia - 2026-11-15 - commit e027e82 - Node v24.19.0 - Windows
+# QA borro node_modules antes de npm ci (instalacion limpia real)
+
+$ node --version
+  v24.19.0
+$ npm ci
+  found 0 vulnerabilities
+$ npm test
+  tests 42 - pass 42 - fail 0 - duration_ms 20173
+  (37 previos V0 + 5 nuevos/subtests de test/s08.test.js: N-0005 hitos/reset/re-jugable + N-0006 escenario)
+$ npm run test:coverage
+  all files | line 98.05% | branch 93.37% | funcs 96.36%   (umbral plan: >=70% lineas)
+$ npm audit --omit=dev
+  found 0 vulnerabilities

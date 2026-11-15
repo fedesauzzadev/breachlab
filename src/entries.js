@@ -31,6 +31,11 @@ function createEntriesRouter(lab) {
   });
 
   router.post('/', (req, res) => {
+    // M-3 (QA V1): auth (headers) e insert (body) pueden quedar a caballo de un reset —
+    // la escritura de una epoch anterior no aterriza en la DB re-seedeada (TOCTOU).
+    if (req.authEpoch !== lab.state.epoch) {
+      return res.status(409).json({ error: 'stale_write', details: 'el incidente fue reiniciado; reenvíe el request' });
+    }
     const problem = validateEntry(req.body);
     if (problem) return res.status(400).json({ error: 'invalid_request', details: problem });
     // §2.1/§2.5: todo POST autenticado escribe; el kind lo da el flujo del lab —

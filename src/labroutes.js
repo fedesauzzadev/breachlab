@@ -16,6 +16,14 @@ const leakedKey = JSON.parse(
 function createLabRoutes(lab, attacker, rateLimiter, auth = null) {
   const router = express.Router();
   router.use(express.json());
+  // L-7 (QA V1): un POST destructivo con body no-JSON (sin content-type o text/plain) era
+  // tratado como vacío — la consola exige application/json explícito.
+  router.use((req, res, next) => {
+    if (req.method !== 'POST' || /^application\/json/i.test(req.get('content-type') || '')) {
+      return next();
+    }
+    res.status(400).json({ error: 'invalid_request', details: 'content-type application/json requerido' });
+  });
   const byKind = lab.db.prepare('SELECT kind, COUNT(*) AS n FROM entries GROUP BY kind');
   const activeKey = lab.db.prepare(
     "SELECT key_plain FROM api_keys WHERE status = 'active' ORDER BY id DESC LIMIT 1");

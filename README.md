@@ -33,6 +33,8 @@ Open **http://127.0.0.1:3000** — no configuration, no env vars, no build step.
 
 You drive the whole response from the panel; the 401/403/429 you see are real HTTP responses produced by the middlewares — not UI effects.
 
+**New in v0.2.0:** the panel now runs in **guided mode** — a 5-milestone checklist that walks the incident act by act, the recommended way to run this demo in front of recruiters. A **reset** button restores the pristine act-1 seed without restarting the process (instant replay), and a **second scenario** (firewall-hardened lab where a valid key without write scope bounces audited `403`s) tells the least-privilege story.
+
 **Read the full story after the run: [Incident postmortem](docs/postmortem.md)** — timeline, impact, root cause, rapid response and long-term fixes, written as a professional incident report.
 
 ## Security notes (read this)

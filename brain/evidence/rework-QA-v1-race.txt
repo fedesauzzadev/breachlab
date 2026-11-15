@@ -1,0 +1,45 @@
+Rework QA V1 — M-3 (TOCTOU del reset): ANTES / DESPUES con el MISMO repro
+Fecha: 2026-11-15 · Base: e027e82 + fix epoch · Node v24.19.0 · Windows
+Repro = socket crudo TCP (P6 trickle deterministico) + spray de 20 sockets con
+headers completos y body retenido (P6b adaptado: la auth PRE-reset queda garantizada
+porque los headers se escriben antes del reset en TODOS los sockets del spray).
+
+## 1. Test rojo ANTES del fix (test/s08.test.js, "M-3 TOCTOU del reset...")
+node --test test/s08.test.js (solo src sin fix) ->
+  AssertionError: The input did not match /^HTTP\/1\.1 409/. Input:
+  'HTTP/1.1 201 Created ... {"id":13}'
+  => repro exacta del reporte QA: fila legit id 13 en acto 1.
+
+## 2. Repro manual ANTES del fix (git stash de src/, mismo script repro-m3.js)
+P6 reset status: 200
+P6 respuesta del POST goteado: HTTP/1.1 201 Created | body: {"id":13}
+P6 health: { status: 'ok', db_entries: 13, act: 1 }
+P6 fila QA-RACE-TRICKLE en DB: true
+P6b reset status: 200
+P6b status lines del spray: {"HTTP/1.1 201 Created":20}
+P6b filas QA-SPRAY sobrevivientes al re-seed: 20
+P6b health: { status: 'ok', db_entries: 32, act: 1 }
+  => ANTES: trickle 201 + fila colada + health 13; spray 20/20 aterrizan, health 32.
+
+## 3. Repro manual DESPUES del fix (mismo script repro-m3.js, src parcheado)
+P6 reset status: 200
+P6 respuesta del POST goteado: HTTP/1.1 409 Conflict | body: {"error":"stale_write","details":"el incidente fue reiniciado; reenvíe el request"}
+P6 health: { status: 'ok', db_entries: 12, act: 1 }
+P6 fila QA-RACE-TRICKLE en DB: false
+P6b reset status: 200
+P6b status lines del spray: {"HTTP/1.1 409 Conflict":20}
+P6b filas QA-SPRAY sobrevivientes al re-seed: 0
+P6b health: { status: 'ok', db_entries: 12, act: 1 }
+  => DESPUES: la race es IMPOSIBLE en ambas variantes; seed 12/0 intacto, acto 1.
+
+## Fix (M-3, 3 toques de codigo)
+- src/lab.js -> state.epoch (0 al crear; reset() la incrementa PRIMERO).
+- src/apikey.js -> apiKeyAuth estampa req.authEpoch = lab.state.epoch al autenticar
+  (la auth viaja con los headers, antes de express.json del body).
+- src/entries.js -> POST / rechaza 409 stale_write si req.authEpoch !== lab.state.epoch
+  (el insert ya no puede aterrizar en una DB re-seedeada con credencial pre-reset).
+
+Nota de metodologia: un primer intento de spray con fetch nativo dio 120x201 porque
+undici encola los headers hasta despues del re-seed (esas escrituras autenticaron
+POST-reset = escrituras legitimas, no sobrevivientes de la race). El spray valido es
+el de sockets crudos con headers ya escritos, que es el que QA describe en P6b.

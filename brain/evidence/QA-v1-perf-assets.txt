@@ -1,0 +1,16 @@
+# QA-v1 perf + assets panel + regresion wiring - 2026-11-15 - PORT=3199 commit e027e82
+
+p95 GET /api/lab/state (60 samples, hot path con milestones nuevos): 17.2 ms
+  max 17.8 - mean 11.6 - umbral NFR-7 200 ms: VERDE (margen ~11x)
+
+GET / -> 200, 7332 bytes HTML; ids V1 presentes 4/4: guided-btn, guided, reset-btn, scenario-btn
+GET /panel.js -> 200; renderGuided presente; rearma cursores en reset (lastEventId=0/lastAuditId=0) presente
+innerHTML en panel.js: 0 usos en codigo (unico match es el COMENTARIO linea 15 que documenta L-3)
+  (falso positivo inicial del probe corregido con Select-String: solo panel.js:15 comentario)
+
+Regresion wiring MVP tras cambios S08 (apikey reset, attacker start(key), server 4to param):
+  /leak/config.json -> 200 - /docs/postmortem.md -> 200
+  bot normal (start sin key): reqs=11 garbage=11 act=2 (crece) - POST /api/entries key original -> 201
+  leak view + postmortem + panel intactos
+
+Re-jugable post-reset: garbage vuelve a crecer, numeracion SPAM-1.. (bot rearmado), health final 12/act1

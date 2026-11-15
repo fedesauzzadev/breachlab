@@ -59,6 +59,7 @@ function createApiKeyAuth(lab) {
     if (hardened && req.method === 'POST' && row.scope !== 'write:entries') {
       return reject(req, res, key, 403, 'insufficient_scope'); // §2.5: escribir exige scope
     }
+    req.authEpoch = lab.state.epoch; // M-3 (QA V1): la auth vale para la epoch vigente al llegar headers
     recordHit(key);
     next();
   };

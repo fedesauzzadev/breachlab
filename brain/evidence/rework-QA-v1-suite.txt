@@ -1,0 +1,28 @@
+Rework QA V1 — suite verde post-fix + smoke walkthrough (reset -> acto 1 con 12 legit)
+Fecha: 2026-11-15 · Node v24.19.0 · Windows · fix M-3 (epoch) + L-7 (content-type)
+
+## 1. Suite completa (npm test, working tree con rework)
+tests 43 · pass 43 · fail 0 · duration 21309 ms
+  (42 previas + 1 nueva: "M-3 TOCTOU del reset: POST autenticado pre-reset con body
+   goteado rebota y no ensucia el seed" — verde solo con el fix)
+
+## 2. Smoke walkthrough real (npm start PORT=3197, proceso vivo)
+ arranque health: { status: 'ok', db_entries: 12, act: 1 }
+ tras incidente health: { status: 'ok', db_entries: 19, act: 2 }        <- bot escribio basura
+ L-7 reset SIN content-type: 400 {"error":"invalid_request","details":"content-type application/json requerido"}
+ L-7 reset text/plain:       400 {"error":"invalid_request","details":"content-type application/json requerido"}
+ L-7 reset con JSON roto:    400 {"error":"invalid_request","details":"body JSON malformado o demasiado grande"}
+ reset valido: 200 {"reset":true}
+ post-reset health: { status: 'ok', db_entries: 12, act: 1 }
+ post-reset state: act=1 db={"legit":12,"garbage":0}
+   milestones={"attack_started":false,"alert_fired":false,"firewalls_applied":false,
+               "hardening_on":false,"reattack_bounced":false} storage=plaintext
+ post-reset timeline: 6 eventos, kinds=["system","traffic","traffic","traffic","traffic","traffic"]
+ POST legit post-reset: 201 {"id":13}      <- el epoch NO rompe escrituras legitimas
+ fila SMOKE presente (esperado true): true
+ health final: { status: 'ok', db_entries: 12, act: 1 }   <- reset final de limpieza
+
+## Nota ambiental
+El primer arranque del smoke fallo con "database is locked": un node server.js
+huerfano (PID 25428) de una corrida anterior retenia data/breachlab.db. Matado el
+proceso, arranque y walkthrough normales. Sin relacion con el rework.

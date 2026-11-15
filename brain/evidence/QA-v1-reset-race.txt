@@ -1,0 +1,47 @@
+# QA-v1 reset bajo carga/ataque + TOCTOU - 2026-11-15 - server npm start PORT=3199 (commit e027e82)
+# probe: qa-v1-race.mjs / qa-v1-race2.mjs (node, fetch + socket crudo net.connect)
+
+## P4 - reset durante ataque plano (bot corriendo, x3)
+P4.1 pre-reset: act=2 db=12/9 reqs=9   -> reset 200 -> LIMPIO (act1 db12/0 ev6 audit0 health12 plaintext) y LIMPIO a +2s
+P4.2 pre-reset: act=2 db=12/9 reqs=9   -> reset 200 -> LIMPIO idem, estable a +2s
+P4.3 pre-reset: act=2 db=12/9 reqs=9   -> reset 200 -> LIMPIO idem, estable a +2s
+(consistencia total: flags/milestones/storage/mask/current todo en valores seed)
+
+## P6 - TOCTOU DETERMINISTICO (hallazgo M-3): body goteado cruza el reset
+Tecnica: socket crudo TCP -> POST /api/entries con headers completos (x-api-key: leak, content-length exacto)
+y SOLO 10 bytes del body. El middleware apikey autentica al llegar headers (corre ANTES de express.json
+del router entries). POST /api/lab/reset {} completa (200). Luego se envia el resto del body.
+Respuesta del POST goteado: HTTP/1.1 201 Created
+Residuo en DB tras el reset: [{"id":13,"kind":"legit","title":"QA-RACE-TRICKLE"}]
+health tras race: {"status":"ok","db_entries":13,"act":1}   <<< 13 legit en acto 1 (contrato: 12)
+El settle de 350 ms del reset solo cubre POSTs del bot ya emitidos; no cubre clientes con body retrasado
+(auth pre-reset + insert post-reseed = escritura con credencial de la demo anterior).
+
+## P6b - spray concurrente (variant probabilistica del mismo bug)
+120 POSTs con key del leak cada 8 ms alrededor del reset (reset tomo 438 ms).
+Markers emitidos ANTES de recibir la respuesta del reset que sobrevivieron al re-seed:
+  QA-SPRAY-61..65 (5 filas, kind=legit)  <<< ~5% de la rafaga pre-respuesta aterriza post-reseed por cola
+
+## P5 - reset durante hardening + escenario 2 con bot corriendo
+pre: attack_started+alert_fired true -> kill/rotate/rate/harden -> milestones 4 true (acto5)
+escenario: 202 key sk_b...eff6, audit=9 filas TODAS 403 insufficient_scope
+reset CON bot del escenario activo -> 200
+P5 inmediato: LIMPIO (act1 12/0 ev6 audit0 plaintext) - P5 +2.5s: LIMPIO (sin inserts tardios)
+timeline?since=6 (cursor pre-reset sin rearmar): 0 eventos  <<< L-8: panel que no rearma queda congelado
+
+## P9 - escenario + rotacion (interaccion)
+fase1: audit 7 filas 403 insufficient_scope -> rotate-key -> fase2: 8 filas nuevas 401 invalid_api_key
+(la rotacion revoca TODAS las active, incluida la del escenario; bot sigue con key muerta auditado, sin crashear)
+estado: garbage=0 reattack_bounced=true storage=sha256
+
+## P3 - escenario disparado dos veces (stop entre disparos)
+1ro=sk_b...562d 2do=sk_b...f859 (202 ambas, distintas) - audit convive con las 2 masks (ambas keys activas en DB)
+timeline: 2 eventos de escenario - post-reset: LIMPIO (las keys de escenario viven solo hasta el reset)
+
+## P8 - downgrade de acto por flood GET (pre-existing S03, L-9)
+hardening directo (sin ataque): act=5 -> 35 GETs rapidos con key activa (GET no exige scope): act=3 + 1 alerta
+recordHit de apikey.js baja act a 3 incondicionalmente; solo alcanzable con flood manual deliberado sin rate limit
+
+## Regresion bot normal tras attacker.start(key)
+attack start (sin key explicita): reqs=11 garbage=11 act=2 (wiring intacto) - POST entries key original: 201
+re-jugable tras reset: primeros SPAM-1,SPAM-2,SPAM-3 (numeracion rearmada) - estado final: {"db_entries":12,"act":1}

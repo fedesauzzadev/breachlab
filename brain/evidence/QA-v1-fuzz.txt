@@ -1,0 +1,19 @@
+# QA-v1 fuzz endpoints S08 (base http://127.0.0.1:3199) - 2026-11-15
+# commit e027e82 - probe: qa-v1-fuzz (node, fetch nativo)
+
+reset objeto con campo extra -> 400 {"error":"invalid_request","details":"body vacio {} - sin campos extra"}
+reset array                  -> 400 (idem)
+reset string/numero/boolean/null literal/JSON roto -> 400 body JSON malformado o demasiado grande (express strict)
+reset body 10KB / unicode hostil / deep nested -> 400 sin campos extra
+reset sin content-type raw   -> 200 {"reset":true}   <<< HALLAZGO L-7: reset destructivo acepta body no-JSON
+reset ct text/plain '{}'     -> 200 {"reset":true}   <<< idem L-7
+reset metodos GET/PUT/PATCH/DELETE -> 404 not_found
+reset query hostil           -> 200 (query ignorado)
+state tras fuzz: act=1 db=12/0 storage=plaintext (consistente)
+
+scenario sin body/campo extra/array/10KB -> 400 sin campos extra
+scenario string/null/JSON roto -> 400 body JSON malformado
+scenario sin content-type    -> 400 requiere hardening activo (body no-JSON pasa validacion, frenado por precondicion)
+scenario /other              -> 404 not_found
+scenario path traversal enc  -> 404 not_found
+health final: {"status":"ok","db_entries":12,"act":1} - proceso VIVO

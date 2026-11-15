@@ -5,6 +5,7 @@
 // escenario 2 — key auténtica y activa SIN scope: POST → 403 insufficient_scope
 // auditado, GET → 200, DB limpia.
 const { readFileSync, mkdtempSync } = require('node:fs');
+const net = require('node:net');
 const os = require('node:os');
 const path = require('node:path');
 const test = require('node:test');
@@ -147,4 +148,39 @@ test('N-0006 escenario 2: key válida sin scope — POST 403 insufficient_scope 
   }
   const read = await fetch(`${base}/api/entries`, { headers: { 'x-api-key': KEY } }); // key activa sin scope
   assert.equal(read.status, 200); // leer SÍ puede — el scope exigido es de escritura
+});
+
+// M-3 (QA V1, hallazgo medio): TOCTOU del reset — la auth viaja con los headers y el
+// insert con el body; un POST autenticado ANTES del reset puede aterrizar DESPUÉS del
+// re-seed y dejar una fila legit extra en el acto 1 (repro P6: socket crudo goteando
+// el body). El fix: epoch del lab estampada en la auth; el handler rechaza 409 si el
+// reset cambió el mundo debajo del request.
+test('M-3 TOCTOU del reset: POST autenticado pre-reset con body goteado rebota y no ensucia el seed', async (t) => {
+  const { lab, server, post, get } = await withServer(t);
+  const port = server.address().port;
+  const body = JSON.stringify({ title: 'QA-RACE-TRICKLE', body: 'escritura de la demo anterior' });
+  const headers =
+    'POST /api/entries HTTP/1.1\r\n' +
+    `Host: 127.0.0.1:${port}\r\n` +
+    'Content-Type: application/json\r\n' +
+    `x-api-key: ${KEY}\r\n` +
+    `Content-Length: ${Buffer.byteLength(body)}\r\n` +
+    'Connection: close\r\n\r\n';
+
+  const sock = net.connect(port, '127.0.0.1');
+  await new Promise((r) => sock.on('connect', r));
+  sock.write(headers + body.slice(0, 10)); // headers completos + 10 bytes: la auth YA corrió
+  await sleep(250); // express.json queda esperando el resto del body
+  assert.equal((await post('/api/lab/reset', {})).status, 200); // reset completa en el medio
+  sock.end(body.slice(10)); // el body restante llega TRAS el re-seed
+
+  const raw = await new Promise((r) => {
+    const chunks = [];
+    sock.on('data', (c) => chunks.push(c));
+    sock.on('close', () => r(Buffer.concat(chunks).toString()));
+  });
+  assert.match(raw, /^HTTP\/1\.1 409/); // sin fix: 201 Created (fila legit id 13 en acto 1)
+  assert.deepEqual(await get('/api/health'),
+    { status: 'ok', db_entries: SEED_LEGIT_ENTRIES, act: 1 }); // sin fix: 13 entries
+  assert.ok(!lab.listEntries().some((e) => e.title === 'QA-RACE-TRICKLE')); // ninguna fila colada
 });
