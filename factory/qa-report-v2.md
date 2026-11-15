@@ -89,8 +89,8 @@ MENORES (nuevos):
   **RESUELTO 2026-11-15, v0.3.1 debt-closure (ADR D-0007)**: la ruta responde `lab.state.scenarioId` leido DESPUES del fullReset. Test de carrera con Promise.all x3 pares en test/debt-closure.test.js: ambas respuestas = ganador efectivo, seed/key del ganador, nunca un nombre huÃ©rfano.
 
 Abiertos de V0/V1 (re-verificados hoy):
-- L-4 - SIGUE (documental): precedencia rateLimit->apikey; re-confirmado en vivo hoy (re-ataque con rate-limit: 10 de 20 rebotes auditados, los 429 no auditan).
-- L-5 - SIGUE: gitleaks fuera de PATH en esta maquina; scan:secrets falla, ruta absoluta exit 0 / 0 findings.
+- L-4 - RESUELTO (2026-11-15, orquestador): precedencia rateLimit->apikey documentada en plan.md §2.5 (nota de middleware chain + detección solo POST por D-0007).
+- L-5 - RESUELTO (2026-11-15, orquestador): gitleaks YA estaba en el PATH de usuario (lo agregó winget); las sesiones abiertas antes de la instalación no lo heredan. Learning L-01 corregido. `scan:secrets` funciona en sesiones nuevas.
 - L-6 - **RESUELTO 2026-11-15, v0.3.1 debt-closure (ADR D-0007)**: re-encode byte-exacto de N-0001..N-0004 (UTF-8 leido como Windows-1252); validador del kit VALID (el mojibake rompia el frontmatter de 4 nodos).
 - L-8 - **RESUELTO 2026-11-15, v0.3.1 debt-closure (ADR D-0007)**: `epoch` expuesta en /api/lab/state; panel.js rearma cursores de timeline/audit al verla cambiar entre polls (reset externo ya no congela la pestana). Lado servidor testeado; wiring del panel verificado en browser por el orquestador.
 - L-9 - **RESUELTO 2026-11-15, v0.3.1 debt-closure (ADR D-0007)**: decision de producto (D-0007) â€” el detector cuenta SOLO escrituras (POST); flood de 40 GETs legÃ­timos en hardening: 40Ã—200, act queda 5, 0 alertas (walkthrough real). Tests nuevos + aceleradores GET migrados a POST.

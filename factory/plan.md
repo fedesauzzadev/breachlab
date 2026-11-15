@@ -127,6 +127,8 @@ breachlab/
 | **Re-ataque** | bot re-disparado usa SIEMPRE la key filtrada original → rebota 401 (si fue rotada) o 403 (sin scope si no lo fue); 0 basura nueva; cada rebote → fila en `audit` con hora, key enmascarada, endpoint y motivo | 401/403 |
 | **Actos (estado)** | 1 normal · 2 attack (corriendo sin alerta) · 3 detected (alerta disparada) · 4 contained (matafuegos aplicado tras detección) · 5 hardened | — |
 
+> **Precedencia de middlewares (L-4):** la cadena es `rateLimit → apikey → handler` — con la ventana de rate limit saturada, un request mal autenticado recibe **429** (el rate limit lo sombra) en vez de su 401/403 teórico. Comportamiento intencional: throttlear antes de autenticar evita trabajo innecesario bajo flood. El detector de anomalía y la máquina de actos cuentan solo POST (D-0007/L-9): floods de GET no degradan el acto.
+
 Seed fijo: 12 entries `legit` + eventos `traffic` iniciales en timeline + 0 eventos de seguridad (AC de N-0001).
 
 ## 3. NFRs medibles (base: `references/security.md`)

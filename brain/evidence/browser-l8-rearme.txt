@@ -1,0 +1,13 @@
+# Evidencia — L-8 rearme del panel ante reset externo (browser real)
+
+Fecha: 2026-11-15 · v0.3.1 (f968db4 + docs). Cierra el flag del dev: "wiring de L-8 en panel.js sin test de render — verificar en browser".
+
+## Corrida
+1. Panel cargado en browser real (http://127.0.0.1:3000), server v0.3.1.
+2. Click real en "Simular ataque" (snapshot ref fresco — nota: los refs caducan con el re-render de 1s del panel, snapshot+click deben ir juntos).
+3. Estado vía fetch in-page: {act:2, epoch:0, garbage:5} — ataque corriendo.
+4. **Reset EXTERNO** (POST /api/lab/reset por curl, sin tocar el panel) → {"reset":true}.
+5. A los ~2.5 s (panel polla cada 1 s): API {act:1, epoch:1, garbage:0} · DOM renderizado: "Operación normal" ✓ · sin alerta "anomalous volume" ✓ · sin basura ✓ · timeline con eventos seed ✓.
+
+## Conclusión
+El wiring epoch→clearIncident() del panel funciona: el panel se rearma solo ante resets externos. L-8 CERRADO con verificación de browser, no solo código.
