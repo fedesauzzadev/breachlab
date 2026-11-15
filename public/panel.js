@@ -26,6 +26,12 @@
       $('attack-requests').textContent = s.attack.requests;
       $('attack-start').disabled = s.attack.running;
       $('attack-stop').disabled = !s.attack.running;
+      // S04: indicadores de matafuegos + key vigente (solo máscara, contrato §2.4).
+      $('fw-kill').disabled = s.flags.killswitch;
+      $('fw-kill').textContent = s.flags.killswitch ? 'Kill switch ✓ ON' : 'Kill switch';
+      $('fw-rate').disabled = s.flags.ratelimit;
+      $('fw-rate').textContent = s.flags.ratelimit ? 'Rate limit ✓ ON' : 'Rate limit';
+      $('key-current').textContent = s.keys.current_masked || '—';
       const feed = $('feed'); // códigos HTTP REALES del bot (base del relato de S04)
       feed.hidden = s.attack.recent.length === 0;
       feed.innerHTML = s.attack.recent
@@ -69,6 +75,14 @@
   }
   $('attack-start').addEventListener('click', () => attack('start'));
   $('attack-stop').addEventListener('click', () => attack('stop'));
+
+  // S04 matafuegos (AC N-0003): POST a /api/lab/firewall/*; el efecto no se finge acá —
+  // llega por polling como códigos 403/401/429 REALES del bot en el feed.
+  const firewall = (name, body) => fetch(`/api/lab/firewall/${name}`, {
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }).catch(() => {});
+  $('fw-kill').addEventListener('click', () => firewall('kill-switch', { enabled: true }));
+  $('fw-rotate').addEventListener('click', () => firewall('rotate-key', {}));
+  $('fw-rate').addEventListener('click', () => firewall('rate-limit', { enabled: true }));
 
   // El leak: la config "versionada" con la key falsa (AC4, FAKE BY DESIGN).
   $('leak-btn').addEventListener('click', async () => {

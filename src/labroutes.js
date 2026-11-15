@@ -12,7 +12,7 @@ const { BOT_INTERVAL_MS } = require('./attacker');
 const leakedKey = JSON.parse(
   readFileSync(path.join(__dirname, '..', 'repo-sim', 'config.json'), 'utf8')).api_key;
 
-function createLabRoutes(lab, attacker) {
+function createLabRoutes(lab, attacker, rateLimiter) {
   const router = express.Router();
   router.use(express.json());
   const byKind = lab.db.prepare('SELECT kind, COUNT(*) AS n FROM entries GROUP BY kind');
@@ -57,6 +57,50 @@ function createLabRoutes(lab, attacker) {
     if (action === 'start') attacker.start();
     else attacker.stop();
     res.status(202).json({ running: lab.state.attack ? lab.state.attack.running : false });
+  });
+
+  // Matafuegos S04 (contrato §2.4): evento action con su efecto (AC4 N-0003); con detección previa → acto 4 (§2.5).
+  const insAction = lab.db.prepare(
+    "INSERT INTO events(ts, kind, severity, message) VALUES (?, 'action', 'success', ?)");
+  const bad = (res, details) => res.status(400).json({ error: 'invalid_request', details });
+  const firewallAction = (msg) => {
+    insAction.run(new Date().toISOString(), msg);
+    if (lab.state.act >= 3) lab.state.act = 4;
+  };
+
+  router.post('/firewall/kill-switch', (req, res) => {
+    if (!req.body || req.body.enabled !== true) return bad(res, 'enabled debe ser true');
+    const mask = lab.killSwitch(); // deshabilita la key COMPROMETIDA (el leak)
+    lab.state.flags.killswitch = true;
+    firewallAction(`Kill switch ON · key ${mask} deshabilitada · cada request con esa key → 403`);
+    res.json({ killswitch: true });
+  });
+
+  router.post('/firewall/rotate-key', (req, res) => {
+    const b = req.body;
+    if (b !== undefined && (typeof b !== 'object' || Array.isArray(b) || Object.keys(b).length > 0)) {
+      return bad(res, 'body vacío {} — sin campos extra');
+    }
+    const mask = lab.rotateKey(); // revoca la vigente, emite una nueva (solo su máscara sale)
+    lab.state.flags.rotated = true;
+    firewallAction(`Rotación de key · filtrada revocada (→401) · nueva key ${mask} activa`);
+    res.json({ new_key_masked: mask });
+  });
+
+  router.post('/firewall/rate-limit', (req, res) => {
+    const b = req.body || {};
+    if (b.enabled !== true) return bad(res, 'enabled debe ser true');
+    const opt = (v, dflt) => (v === undefined ? dflt : (Number.isInteger(v) ? v : NaN));
+    const max = opt(b.max, 10);
+    const windowMs = opt(b.window_ms, 10_000);
+    if (!(max >= 1 && max <= 1000) || !(windowMs >= 1000 && windowMs <= 600_000)) {
+      return bad(res, 'max: entero 1..1000 · window_ms: entero 1000..600000');
+    }
+    rateLimiter.cfg.enabled = true;
+    rateLimiter.configure({ max, windowMs }); // ventanas limpias → la ráfaga post-ON arranca de 0
+    lab.state.flags.ratelimit = true;
+    firewallAction(`Rate limit ON · ${max} req / ${windowMs / 1000} s por key · exceso → 429`);
+    res.json({ ratelimit: true, max, window_ms: windowMs });
   });
 
   return router;

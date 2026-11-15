@@ -14,6 +14,7 @@ const { createApiKeyAuth } = require('./src/apikey');
 const { createEntriesRouter } = require('./src/entries');
 const { createLabRoutes } = require('./src/labroutes');
 const { createAttacker } = require('./src/attacker');
+const { createRateLimiter } = require('./src/ratelimit');
 
 const HOST = '127.0.0.1'; // aislamiento del sandbox: nunca 0.0.0.0 (ADR D-0003)
 const DEFAULT_PORT = 3000; // único env opt-in: PORT (plan §3)
@@ -31,10 +32,11 @@ function buildApp(lab, attacker = createAttacker({ lab })) {
     res.json({ status: 'ok', db_entries: lab.countEntries(), act: lab.state.act });
   });
 
-  // API víctima detrás del middleware x-api-key (cadena §2.1: apikey → contador → handler).
-  app.use('/api/entries', createApiKeyAuth(lab), createEntriesRouter(lab));
-  // Consola del defensor (state, timeline, attack).
-  app.use('/api/lab', createLabRoutes(lab, attacker));
+  // API víctima detrás de la cadena §2.1: rateLimit → apikey → contador → handler.
+  const rateLimiter = createRateLimiter();
+  app.use('/api/entries', rateLimiter.middleware, createApiKeyAuth(lab), createEntriesRouter(lab));
+  // Consola del defensor (state, timeline, attack, firewall).
+  app.use('/api/lab', createLabRoutes(lab, attacker, rateLimiter));
 
   // El leak servido read-only: la "config versionada" con la key falsa (AC4, ADR D-0003 §6).
   app.get('/leak/config.json', (_req, res) => {

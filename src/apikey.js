@@ -1,8 +1,9 @@
 'use strict';
-// Middleware x-api-key (plan §2.1: apikey → contador → handler). S03 = modo vulnerable:
-// comparación plaintext contra la key activa — la mala práctica que el lab denuncia.
-// Incluye el contador de detección: >30 hits de una misma key en ventana móvil de 10 s
-// → evento alert critical con cooldown 15 s (números FIJOS, ADR D-0004).
+// Middleware x-api-key (plan §2.1: rateLimit → apikey → handler). S03 = modo vulnerable:
+// plaintext contra la key activa (la mala práctica que el lab denuncia). S04: la respuesta
+// depende del ESTADO — kill switch (disabled) → 403 key_disabled · sin key / revocada por
+// rotación → 401 invalid_api_key (D-0004). S05 agrega sha256+scope. Detección: >30 hits de
+// una misma key en ventana móvil de 10 s → alert critical con cooldown 15 s (ADR D-0004).
 const { maskKey } = require('./lab');
 
 const DETECTION_MAX_REQUESTS = 30; // estrictamente mayor dispara la alerta
@@ -14,6 +15,7 @@ function createApiKeyAuth(lab) {
   let lastAlertAt = 0;
   const insAlert = lab.db.prepare(
     "INSERT INTO events(ts, kind, severity, message) VALUES (?, 'alert', 'critical', ?)");
+  const getKeyStatus = lab.db.prepare('SELECT status FROM api_keys WHERE key_plain = ?');
 
   function recordHit(key) {
     const now = Date.now();
@@ -30,8 +32,12 @@ function createApiKeyAuth(lab) {
 
   return function apiKeyAuth(req, res, next) {
     const key = req.get('x-api-key');
-    if (!key || !lab.isKeyActive(key)) {
-      return res.status(401).json({ error: 'invalid_api_key' }); // D-0004
+    const row = key ? getKeyStatus.get(key) : undefined;
+    if (row && row.status === 'disabled') {
+      return res.status(403).json({ error: 'key_disabled' }); // kill switch (D-0004)
+    }
+    if (!row || row.status !== 'active') {
+      return res.status(401).json({ error: 'invalid_api_key' }); // sin key / revocada (rotación)
     }
     recordHit(key);
     next();

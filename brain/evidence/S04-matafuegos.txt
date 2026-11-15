@@ -1,0 +1,45 @@
+# S04 — Matafuegos (N-0003) · evidencia · 2026-11-14
+
+## Tests — `npm ci && npm test`
+24/24 pass, 0 fail (9 S01/S02 + 9 S03 + 6 nuevos de S04). Duración ~7-8 s.
+Destaques S04 (test/firewall.test.js):
+- AC1 kill switch: 403 key_disabled + basura congelada + blocked creciendo + evento con hora + acto 3→4 ✔
+- AC2 rotación: máscara only en respuesta + key vieja → 401 + nueva key legítima (201) + re-ataque rebota 401 ✔
+- AC3+NFR-5 rate limit default 10/10s: 25 en ráfaga → EXACTAMENTE 10×2xx y 15×429, todos los 429 con Retry-After ≥ 1 ✔
+- AC3 custom max=3/60s: 6 requests → 3×201 + 3×429; bot estrangulado → feed 100% 429 ✔
+- Combinados en cualquier orden: rotate→killswitch sobre la key filtrada → 403 (disabled pisa revoked); flags {killswitch,ratelimit,rotated} íntegros ✔
+- Validación 400: 14 bodies inválidos (tipos, enabled≠true, max/window_ms fuera de rango) + bordes de rango aceptados (1/1000, 1000/600000) ✔
+
+## Funcional — `npm start` (PORT 3311/3312/3313) + curl, un server fresco por matafuego
+
+### 1) Kill switch (127.0.0.1:3311)
+- attack start → 2 s → state: act=2, requests=7, garbage=7, feed 100% 201.
+- POST /api/lab/firewall/kill-switch {"enabled":true} → {"killswitch":true}.
+- state 2 s después: act=4, requests=54 (bot NO se detiene), blocked=8→creciendo,
+  feed: [...201×12, 403×8] — el virado 201→403 es EXACTAMENTE en el ts del switch.
+  db.garbage congelado en 46 (el bot dejó de consumir). keys.current_masked=null (sin key activa — honesto).
+- curl directo POST /api/entries con la key filtrada → 403 {"error":"key_disabled"}.
+- timeline: evento kind=action severity=success "Kill switch ON · key sk_b…3a9c deshabilitada · cada request con esa key → 403" (tras la alerta critical de detección 31 req/10 s).
+
+### 2) Rotación (127.0.0.1:3312)
+- attack start → 2 s → POST /api/lab/firewall/rotate-key {} → {"new_key_masked":"sk_b…357b"} (solo máscara).
+- state: flags.rotated=true, keys.current_masked="sk_b…357b" ≠ leaked_masked="sk_b…3a9c".
+  feed: [...201×7, 401×8] — el bot SIGUE usando la key del repo-sim → 401 reales. garbage congelado en 7.
+- curl directo con la key filtrada → 401 {"error":"invalid_api_key"}.
+
+### 3) Rate limit (127.0.0.1:3313)
+- attack start → 2 s → POST /api/lab/firewall/rate-limit {"enabled":true} → {"ratelimit":true,"max":10,"window_ms":10000}.
+- Ráfaga manual de 25 POST con la key del bot: 201=9, 429=16. NOTA: 9 y no 10 porque el bot
+  corre concurrente y comparte el bucket por-key (se llevó 1 slot de la ventana) — semántica
+  fixed-window POR KEY correcta. El caso aislado exacto 10/15 está probado en el test NFR-5 (sin bot).
+- Header verbatim de un 429: "HTTP/1.1 429 Too Many Requests" + "Retry-After: 10".
+- state final: feed [201×8, 429×9] — los 429 dominan. timeline: "Rate limit ON · 10 req / 10 s por key · exceso → 429".
+
+## NFR-2 secrets — gitleaks 8.30.1 (vía winget)
+`gitleaks detect --source . --no-git -c .gitleaks.toml` → "no leaks found", exit=0.
+El template sk_breachlab_demo_ROTATED_ del código cae bajo la allowlist del prefijo falso.
+
+## Notas
+- Orden middleware verificado (§2.1): rateLimit → apikey → handler (server.js).
+- Flags en /api/lab/state reflejan {killswitch, ratelimit, rotated} (contrato §2.4).
+- Acto 4 (contained) solo con detección previa (§2.5 "matafuegos aplicado tras detección").

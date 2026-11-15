@@ -2,6 +2,7 @@
 // Núcleo del lab (plan §2.3): node:sqlite — schema, seed fijo y estado runtime. Números: ADR D-0004.
 const { mkdirSync, readFileSync } = require('node:fs');
 const path = require('node:path');
+const { randomBytes } = require('node:crypto');
 const { DatabaseSync } = require('node:sqlite');
 
 const SEED_LEGIT_ENTRIES = 12; // D-0004: cantidad fija y documentada
@@ -98,6 +99,21 @@ function createLab({ file } = {}) {
     isKeyActive: (key) =>
       !!db.prepare("SELECT 1 FROM api_keys WHERE key_plain = ? AND status = 'active'").get(key),
     maskKey,
+    // S04 matafuegos (§2.5): acciones sobre la key COMPROMETIDA — el leak del artefacto repo-sim.
+    killSwitch: () => {
+      db.prepare("UPDATE api_keys SET status = 'disabled' WHERE key_plain = ?").run(leakedKey);
+      return maskKey(leakedKey);
+    },
+    rotateKey: () => {
+      // La "key vieja" es la activa vigente (leaked o rotación previa) → revoked.
+      db.prepare("UPDATE api_keys SET status = 'revoked' WHERE status = 'active'").run();
+      // Nueva key falsa con el prefijo propio (FAKE BY DESIGN, allowlist gitleaks).
+      const fresh = `sk_breachlab_demo_ROTATED_${randomBytes(8).toString('hex')}`;
+      db.prepare(
+        "INSERT INTO api_keys(label, key_plain, status, created_at) VALUES ('rotated', ?, 'active', ?)"
+      ).run(fresh, new Date().toISOString());
+      return maskKey(fresh); // solo la máscara sale del lab
+    },
   };
 }
 
