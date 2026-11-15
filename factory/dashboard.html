@@ -37,7 +37,7 @@
 <body>
 <header>
   <h1>🏭 BreachLab</h1>
-  <span class="sub">NSDD Software Factory · actualizado 2026-11-15 · MVP completo · QA SHIP ✓ · G2 pendiente</span>
+  <span class="sub">NSDD Software Factory · actualizado 2026-11-15 · V1 completa · QA V1 SHIP ✓ · G3 pendiente</span>
 </header>
 <nav>
   <button class="on" data-t="mvp">MVP</button>
@@ -52,9 +52,9 @@
   <h2>Entregable MVP</h2>
   <div class="card"><ul>
     <li>Lab interactivo 100% local del incidente real: API key filtrada → ataque → detección → matafuegos → hardening (5 actos).</li>
-    <li><b>MVP/V0 completo y verificado — veredicto QA: SHIP.</b> Los 5 actos end-to-end: ataque con key filtrada, detección 8 s, matafuegos (kill switch/rotación/rate limit), hardening (sha256+scopes+audit), re-ataque rebotado, postmortem EN.</li>
-    <li>Rework post-QA aplicado: M-1 script cobertura · M-2 DB corrupta → reseed · L-3 textContent. Pendientes menores: L-4 (doc) · L-5 (PATH gitleaks) · L-6 (cosmético).</li>
-    <li>Probar: <span class="kbd">npm ci</span> + <span class="kbd">npm start</span> → <span class="kbd">http://127.0.0.1:3000</span> · panel en español, postmortem en <span class="kbd">/docs/postmortem.md</span></li>
+    <li><b>V1 entregada y verificada (v0.2.0)</b> — además del MVP: modo guiado (5 pasos con hitos automáticos), reinicio del incidente sin restart, escenario 2 "key válida sin scope" (mínimo privilegio). QA V1: SHIP, race del reset cerrada con evidencia antes/después.</li>
+    <li>Declarada como deuda: L-8 (cursores timeline tras reset externo) · L-9 (flood de GETs válidos dispara alerta) · L-4/L-5/L-6 (menores V0).</li>
+    <li>Probar: <span class="kbd">npm ci</span> + <span class="kbd">npm start</span> → <span class="kbd">http://127.0.0.1:3000</span> — activá "Modo guiado" y "Escenario 2" desde el panel.</li>
     <li>Sandbox aislado: bind solo 127.0.0.1, keys 100% falsas, cero llamadas a terceros (verificado S01 con netstat+grep).</li>
   </ul></div>
 </section>
@@ -77,8 +77,8 @@
     <div class="card"><h3>N-0004 · H-04 Hardening</h3><span class="chip st-verified">verified (S05+S06)</span><ul>
       <li class="li-ok">☑ Key como hash sha256, scope por endpoint (DB sin plaintext)</li><li class="li-ok">☑ Re-ataque rebota, 0 basura nueva</li><li class="li-ok">☑ Audit log con intentos bloqueados</li><li class="li-ok">☑ Postmortem EN (6.9 KB, servido + linkeado)</li>
     </ul></div>
-    <div class="card"><h3>N-0005 · H-05 Modo guiado + reinicio (V1)</h3><span class="chip st-planned">planned</span><ul><li>☐ Pasos numerados con siguiente resaltado</li><li>☐ Reiniciar incidente sin reiniciar proceso</li></ul></div>
-    <div class="card"><h3>N-0006 · H-06 Escenario key sin scope (V1)</h3><span class="chip st-planned">planned</span><ul><li>☐ Key válida sin escritura → 403 + audit</li><li>☐ Panel conecta con mínimo privilegio</li></ul></div>
+    <div class="card"><h3>N-0005 · H-05 Modo guiado + reinicio (V1)</h3><span class="chip st-verified">verified (S08)</span><ul><li class="li-ok">☑ Pasos numerados con siguiente resaltado</li><li class="li-ok">☑ Reiniciar incidente sin reiniciar proceso</li></ul></div>
+    <div class="card"><h3>N-0006 · H-06 Escenario key sin scope (V1)</h3><span class="chip st-verified">verified (S08)</span><ul><li class="li-ok">☑ Key válida sin escritura → 403 + audit</li><li class="li-ok">☑ Panel conecta con mínimo privilegio</li></ul></div>
     <div class="card"><h3>N-0007 · H-07 Serie de labs (V2)</h3><span class="chip st-planned">planned</span><ul><li>☐ Escenarios elegibles, ciclo completo c/u</li></ul></div>
     <div class="card"><h3>N-0008 · H-08 Export de evidencia (V2)</h3><span class="chip st-planned">planned</span><ul><li>☐ Archivo legible con cronología sin correr nada</li></ul></div>
   </div>
@@ -88,7 +88,7 @@
   <h2>Entregas de valor</h2>
   <div class="timeline">
     <div class="tl-item done"><h3>V0 — MVP: el incidente completo (S01..S06)</h3><p>S01..S06 <b style="color:var(--ok)">✓ todos entregados y verificados</b> (S01 sandbox · S02 panel+docs+secrets · S03 ataque+detección · S04 matafuegos · S05 hardening · S06 postmortem+DoD). Valor: la demo completa de <5 min — <b style="color:var(--ok)">SHIP, esperando G2</b>.</p></div>
-    <div class="tl-item"><h3>V1 — Narración sin fricción (S07)</h3><p>Modo guiado paso a paso + reinicio del incidente + escenario key-sin-scope. — <i>futuro</i>. Necesita: V0 aprobado.</p></div>
+    <div class="tl-item done"><h3>V1 — Narración sin fricción (S08) <b style="color:var(--ok)">✓ ENTREGADA v0.2.0</b></h3><p>Modo guiado paso a paso + reinicio del incidente + escenario key-sin-scope. QA V1: SHIP (rework M-3/M-4/L-7 aplicado). Deuda declarada: L-8/L-9.</p></div>
     <div class="tl-item"><h3>V2 — Serie de labs + export (S08)</h3><p>Nuevos vectores de filtración como escenarios elegibles + export de evidencia. — <i>futuro</i>. Necesita: V1.</p></div>
   </div>
 </section>
@@ -96,7 +96,7 @@
 <section id="quality">
   <h2>Verificación y QA</h2>
   <div class="kpi">
-    <div class="card"><b>37/37</b>tests verdes (suite MVP)</div>
+    <div class="card"><b>43/43</b>tests verdes (V0+V1)</div>
     <div class="card"><b>97.8%</b>cobertura líneas (umbral 70%)</div>
     <div class="card"><b>16/23 ms</b>p95 GET state / POST entries (umbral 200)</div>
     <div class="card"><b>0/0/2*</b>hallazgos QA crit/high/medium (*resueltos)</div>
@@ -111,6 +111,7 @@
   <div class="grid">
     <div class="card"><h3>L-01 · gitleaks no persiste en PATH entre sesiones</h3><p>Gate de secrets se corre por ruta absoluta del binario winget (verificada) o reinstall por sesión. En fábrica: anotar la ruta verificada en el repo.</p></div>
     <div class="card"><h3>L-02 · Sesión muerta por límite de uso</h3><p>S06 se construyó en una sesión que murió por usage limit sin commitear. Lección: commits incrementales por slice ANTES de la verificación final; la sesión siguiente auditó y re-verificó desde cero (recuperación barata porque el brain tenía el estado).</p></div>
+    <div class="card"><h3>L-03 · Server de demo vs smoke tests</h3><p>El server de demo (puerto 3000) bloquea la DB para los smokes; se mata y renace en cada rework. Lección: demo y verificación usan procesos/DBs distintos (smoke con PORT efímero), el de demo es desechable.</p></div>
   </div>
 </section>
 

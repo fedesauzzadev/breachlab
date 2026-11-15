@@ -11,3 +11,9 @@
 - Intentos: re-lanzar subagent (falló por límite); al día siguiente, dev nuevo auditó el diff huérfano contra las AC.
 - Resolución: auditoría + re-verificación completa desde cero (instalación limpia, suite, walkthrough) + cierre de nodo + commit. Recuperación barata SOLO porque el brain tenía el estado exacto del proyecto.
 - Lección: commit incremental al terminar cada unidad de trabajo verificable, no al final del slice. Un diff huérfano sin brain habría sido rehacerlo de cero.
+
+## L-03 — Server de demo compite con smoke tests por la DB
+- Qué pasó: el server de demo del Negocio (puerto 3000) bloqueaba la DB cuando el rework S08 quiso correr smokes; un server huérfano de corrida previa hizo fallar el primer arranque.
+- Intentos: arranque directo (falla por lock), localizar proceso.
+- Resolución: matar el huérfano, smoke con puerto propio, demo renacida después.
+- Lección: verificación funcional siempre con PORT efímero/propio; el server de demo es desechable y se reinicia al final, no se protege durante builds.
