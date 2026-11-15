@@ -37,7 +37,7 @@
 <body>
 <header>
   <h1>🏭 BreachLab</h1>
-  <span class="sub">NSDD Software Factory · actualizado 2026-11-14 · post S02</span>
+  <span class="sub">NSDD Software Factory · actualizado 2026-11-14 · post S03</span>
 </header>
 <nav>
   <button class="on" data-t="mvp">MVP</button>
@@ -52,8 +52,8 @@
   <h2>Entregable MVP</h2>
   <div class="card"><ul>
     <li>Lab interactivo 100% local del incidente real: API key filtrada → ataque → detección → matafuegos → hardening (5 actos).</li>
-    <li>Estado actual: <b>S01+S02 implementados</b> — API víctima en loopback + panel del defensor en español (estado, timeline polling 1s, botón "ver el leak") + READMEs EN/ES + gate de secrets (gitleaks 0 findings).</li>
-    <li>Pendiente del MVP: S03 ataque+detección · S04 matafuegos · S05 hardening · S06 postmortem+DoD.</li>
+    <li>Estado actual: <b>S01..S03 implementados</b> — API + panel + modo ataque: bot in-process con la key filtrada llena la DB en vivo, detección por umbral (30 req/10s) dispara alerta critical.</li>
+    <li>Pendiente del MVP: S04 matafuegos · S05 hardening · S06 postmortem+DoD.</li>
     <li>Probar hoy: <span class="kbd">npm ci</span> + <span class="kbd">npm start</span> → <span class="kbd">http://127.0.0.1:3000</span></li>
     <li>Sandbox aislado: bind solo 127.0.0.1, keys 100% falsas, cero llamadas a terceros (verificado S01 con netstat+grep).</li>
   </ul></div>
@@ -68,8 +68,8 @@
       <li class="li-ok">☑ Cero red externa (netstat + grep)</li>
       <li class="li-ok">☑ READMEs EN/ES · botón panel "ver el leak"</li><li><span class="li-ok">☑ gitleaks 0 findings (validado con control negativo)</span></li>
     </ul></div>
-    <div class="card"><h3>N-0002 · H-02 Modo ataque</h3><span class="chip st-planned">planned</span><ul>
-      <li>☐ Bot in-process con key filtrada, no se detiene solo</li><li>☐ Panel en vivo: basura crece en DB</li><li>☐ Umbral → alerta roja con hora y motivo</li><li>☐ Detener manual → estado degradado persiste</li>
+    <div class="card"><h3>N-0002 · H-02 Modo ataque</h3><span class="chip st-implemented">implemented (S03, AC completas)</span><ul>
+      <li class="li-ok">☑ Bot in-process con key filtrada, no se detiene solo</li><li class="li-ok">☑ Panel en vivo: basura crece en DB + feed de códigos</li><li class="li-ok">☑ Umbral → alerta roja (disparó en hit 31) + cooldown 15s</li><li class="li-ok">☑ Detener manual → estado degradado persiste</li>
     </ul></div>
     <div class="card"><h3>N-0003 · H-03 Matafuegos</h3><span class="chip st-planned">planned</span><ul>
       <li>☐ Kill switch → 403, contadores frenan</li><li>☐ Rotación → key vieja muere (401)</li><li>☐ Rate limit → 429 + Retry-After</li><li>☐ Cada acción → evento en timeline</li>
@@ -87,7 +87,7 @@
 <section id="roadmap">
   <h2>Entregas de valor</h2>
   <div class="timeline">
-    <div class="tl-item"><h3>V0 — MVP: el incidente completo (S01..S06)</h3><p>S01 Sandbox vivo <b style="color:var(--ok)">✓ entregado</b> · S02 Panel+docs+secrets <b style="color:var(--ok)">✓ entregado</b> · S03 Ataque+detección · S04 Matafuegos · S05 Hardening · S06 Postmortem+DoD — <i>en plan</i>. Valor: la demo completa de <5 min.</p></div>
+    <div class="tl-item"><h3>V0 — MVP: el incidente completo (S01..S06)</h3><p>S01 Sandbox vivo <b style="color:var(--ok)">✓ entregado</b> · S02 Panel+docs+secrets <b style="color:var(--ok)">✓ entregado</b> · S03 Ataque+detección <b style="color:var(--ok)">✓ entregado</b> · S04 Matafuegos · S05 Hardening · S06 Postmortem+DoD — <i>en plan</i>. Valor: la demo completa de <5 min.</p></div>
     <div class="tl-item"><h3>V1 — Narración sin fricción (S07)</h3><p>Modo guiado paso a paso + reinicio del incidente + escenario key-sin-scope. — <i>futuro</i>. Necesita: V0 aprobado.</p></div>
     <div class="tl-item"><h3>V2 — Serie de labs + export (S08)</h3><p>Nuevos vectores de filtración como escenarios elegibles + export de evidencia. — <i>futuro</i>. Necesita: V1.</p></div>
   </div>
@@ -96,7 +96,7 @@
 <section id="quality">
   <h2>Verificación y QA</h2>
   <div class="kpi">
-    <div class="card"><b>9/9</b>tests verdes (S01+S02)</div>
+    <div class="card"><b>18/18</b>tests verdes (S01..S03)</div>
     <div class="card"><b>0</b>findings gitleaks (gate activo)</div>
     <div class="card"><b>—</b>p95 — pendiente</div>
     <div class="card"><b>—</b>QA adversarial — pendiente (Fase 4)</div>
