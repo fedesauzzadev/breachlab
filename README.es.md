@@ -33,6 +33,25 @@ Abrí **http://127.0.0.1:3000** — sin configuración, sin variables de entorno
 
 Manejas toda la respuesta desde el panel; los 401/403/429 que ves son respuestas HTTP reales producidas por los middlewares — no efectos de UI.
 
+## Demo — el incidente en cinco capturas
+
+Capturas reales de la consola del defensor, el mismo flujo que ves con `npm start`:
+
+**Acto 1 · Normal** — la API sirve tráfico legítimo. La bomba ya está plantada: la key está filtrada en una config "versionada".
+![Acto 1 — operación normal, seed, timeline limpio](docs/screenshots/acto1-normal.png)
+
+**Acto 2 · Ataque** — el bot interno dispara con la key filtrada; los requests anómalos y la basura en DB crecen en vivo.
+![Acto 2 — ataque en curso, contadores creciendo](docs/screenshots/acto2-ataque.png)
+
+**Acto 3 · Detección** — el volumen cruza el umbral: alerta critical con hora, key enmascarada y motivo.
+![Acto 3 — alerta roja en el timeline](docs/screenshots/acto3-deteccion.png)
+
+**Acto 4 · Contención** — kill switch + rotación + rate limit. El feed muestra 403/401/429 reales; el atacante se rinde tras 20 rebotes consecutivos.
+![Acto 4 — matafuegos, feed lleno de requests rebotadas](docs/screenshots/acto4-matafuegos.png)
+
+**Acto 5 · Hardening** — keys como hashes sha256, scopes exigidos, cada intento bloqueado auditado. El re-ataque rebota, cero basura nueva.
+![Acto 5 — sistema endurecido con audit log](docs/screenshots/acto5-hardening.png)
+
 **Nuevo en v0.3.0:** BreachLab es ahora una **serie de labs** — elegí cómo se filtró la
 key (config versionada · log de errores del server expuesto · bundle del frontend
 legacy) y rejugá el mismo incidente en 5 actos sobre ese vector, cada uno con su

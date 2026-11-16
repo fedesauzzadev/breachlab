@@ -1,10 +1,9 @@
 # BreachLab
 
-<!-- BADGES (uncomment after the first push — see docs/PUBLISHING.md):
+<!-- BADGES -->
 [![CI](https://github.com/fedesauzzadev/breachlab/actions/workflows/ci.yml/badge.svg)](https://github.com/fedesauzzadev/breachlab/actions/workflows/ci.yml)
 [![gitleaks](https://img.shields.io/badge/protected%20by-gitleaks-blue)](https://github.com/gitleaks/gitleaks-action)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
--->
 
 Interactive, 100% local sandbox that recreates a classic security incident end to end: an **API key leaked in a versioned config file**, abused by an attacker to flood the database, detected by anomaly monitoring, contained with a kill switch / key rotation / rate limit, and finally hardened (hashed keys, scopes, audit log).
 
@@ -32,6 +31,25 @@ Open **http://127.0.0.1:3000** — no configuration, no env vars, no build step.
 | **5 · Hardened** | Keys move to sha256 hashes, scopes get enforced, blocked attempts land in the audit log. Re-attack bounces. |
 
 You drive the whole response from the panel; the 401/403/429 you see are real HTTP responses produced by the middlewares — not UI effects.
+
+## Demo — the incident in five screenshots
+
+Real captures from the defender's console, same flow you get with `npm start`:
+
+**Act 1 · Normal** — the API serves legit traffic. The bomb is already planted: the key sits leaked in a "versioned" config file.
+![Act 1 — normal operation, seed data, clean timeline](docs/screenshots/acto1-normal.png)
+
+**Act 2 · Attack** — the in-process bot fires with the leaked key; anomalous requests and DB garbage grow live.
+![Act 2 — attack in progress, counters growing](docs/screenshots/acto2-ataque.png)
+
+**Act 3 · Detected** — volume crosses the threshold: critical alert with time, masked key and reason.
+![Act 3 — red alert in the timeline](docs/screenshots/acto3-deteccion.png)
+
+**Act 4 · Contained** — kill switch + rotation + rate limit. The feed shows real 403/401/429; the attacker gives up after 20 consecutive bounces.
+![Act 4 — firefighting, feed full of bounced requests](docs/screenshots/acto4-matafuegos.png)
+
+**Act 5 · Hardened** — keys stored as sha256 hashes, scopes enforced, every blocked attempt audited. Re-attack bounces, zero new garbage.
+![Act 5 — hardened system with audit log](docs/screenshots/acto5-hardening.png)
 
 **New in v0.3.0:** BreachLab is now a **series of labs** — choose how the key leaked
 (versioned config · exposed server error log · legacy frontend bundle) and replay the
