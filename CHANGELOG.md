@@ -3,6 +3,27 @@
 Format based on [Keep a Changelog](https://keepachangelog.com/); versioning follows
 [SemVer](https://semver.org/).
 
+## [0.4.0] — 2026-11-15
+Docker: run the lab with no Node.js installed — same loopback isolation (ADR D-0008).
+
+### Added
+- **Docker + docker compose.** `docker compose up --build` → **http://127.0.0.1:3000**.
+  Minimal `node:24-alpine` image (255MB), no build step, non-root `node` user, ephemeral
+  `data/` (the lab reseeds on every start, by design). CI gains a `docker-build` job
+  (build only, no push).
+- **`HOST` env var in `server.js`** — the only change to the Node path. Default remains
+  `127.0.0.1` (ADR D-0003): without the env, zero behavior change. It exists solely for
+  the container, where the bind must be `0.0.0.0` (Docker can't reach a container's
+  loopback); the attacker bot keeps attacking the internal `127.0.0.1` — same process.
+  The host-level isolation is preserved by the compose port binding
+  `"127.0.0.1:3000:3000"`: Docker publishes **only** on the host's loopback (verified
+  with `netstat` during a live run — evidence in `brain/evidence/docker-deploy.txt`).
+
+### Fixed
+- **`PORT=0` now really means an ephemeral port.** `parseInt('0') || 3000` swallowed the
+  zero (falsy) and collided on port 3000; now any integer `PORT` is honored, everything
+  else still falls back to 3000. No observable change for the default `npm start` path.
+
 ## [0.3.1] — 2026-11-15
 Debt closure: five minor QA findings closed (L-6, L-8, L-9, L-10, L-11 — ADR D-0007).
 

@@ -16,7 +16,10 @@ const { createLabRoutes } = require('./src/labroutes');
 const { createAttacker } = require('./src/attacker');
 const { createRateLimiter } = require('./src/ratelimit');
 
-const HOST = '127.0.0.1'; // aislamiento del sandbox: nunca 0.0.0.0 (ADR D-0003)
+// Aislamiento del sandbox: default loopback, nunca 0.0.0.0 "por si acaso" (ADR D-0003).
+// HOST existe SOLO para el contenedor Docker, donde el bind debe ser 0.0.0.0 (ADR D-0008);
+// sin el env el comportamiento es idéntico al de siempre.
+const HOST = process.env.HOST || '127.0.0.1';
 const DEFAULT_PORT = 3000; // único env opt-in: PORT (plan §3)
 
 function buildApp(lab, attacker = createAttacker({ lab })) {
@@ -68,12 +71,14 @@ function buildApp(lab, attacker = createAttacker({ lab })) {
 }
 
 if (require.main === module) {
-  const port = Number.parseInt(process.env.PORT, 10) || DEFAULT_PORT;
+  // PORT=0 válido (puerto efímero — tests); sin PORT o basura → default (NaN no es entero).
+  const portArg = Number.parseInt(process.env.PORT, 10);
+  const port = Number.isInteger(portArg) ? portArg : DEFAULT_PORT;
   // BREACHLAB_DB: los smokes/walkthroughs usan su propia DB y no pisan la demo (L-03).
   const lab = createLab({ file: process.env.BREACHLAB_DB || path.join(__dirname, 'data', 'breachlab.db') });
   const attacker = createAttacker({ lab, port }); // PORT fluye a bot y server (ADR D-0003)
-  buildApp(lab, attacker).listen(port, HOST, () => {
-    console.log(`[breachlab] http://${HOST}:${port} — sandbox local · acto 1 (normal)`);
+  const server = buildApp(lab, attacker).listen(port, HOST, () => { // address().port: con PORT=0 reporta el efímero real
+    console.log(`[breachlab] http://${HOST}:${server.address().port} — sandbox local · acto 1 (normal)`);
   });
 }
 

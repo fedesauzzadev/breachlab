@@ -1,0 +1,10 @@
+# BreachLab — demo con Docker (ADR D-0008).
+# CRÍTICO (preserva D-0003 a nivel host): el puerto se publica SOLO en el loopback del host.
+# "127.0.0.1:3000:3000" hace que docker-proxy bindee 127.0.0.1 — desde otra máquina el lab
+# sigue siendo inalcanzable, exactamente igual que con `npm start`. NO cambiar a "3000:3000".
+# data/ sin volumen: efímera por diseño (el lab re-seedea al arrancar).
+services:
+  breachlab:
+    build: .
+    ports:
+      - "127.0.0.1:3000:3000"

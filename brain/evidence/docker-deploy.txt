@@ -1,0 +1,80 @@
+# Docker + docker compose — verificación de deploy (slice v0.4.0)
+
+Fecha: 2026-11-15 · Docker 29.9.2 + Compose v5.6.1 (Windows/Docker Desktop)
+Ámbito: build de imagen, deploy con compose, health check desde el host,
+aislamiento de red a nivel host (D-0003), teardown limpio, suite.
+
+## 1. Build de imagen
+
+Comando: `docker build -t breachlab:0.4.0 .`
+Esperado: exit 0, imagen tagueada, sin paso de build de frontend (sin build step).
+Observado: exit=0 · `#15 naming to docker.io/library/breachlab:0.4.0 done` · `#15 DONE 0.2s`
+(log completo: capas COPY package*.json → npm ci --omit=dev → COPY server.js/src/public/repo-sim/docs → ENV HOST=0.0.0.0 → USER node).
+Tamaño final: `breachlab:0.4.0  255MB` (`docker images`).
+Nota de la corrida: dos builds previos `docker build .` (sin -t) reportaron exit 1 desde
+PowerShell por el stderr de BuildKit + pipe (`NativeCommandError` PS) — el build mismo
+terminó DONE; con `*> file` y `$LASTEXITCODE` el exit real es 0. No es bug del Dockerfile.
+
+## 2. Compose up
+
+Comando: `docker compose up --build -d`
+Esperado: contenedor Up, puerto publicado SOLO en loopback del host.
+Observado: exit=0 ·
+  NAME                    STATUS                  PORTS
+  breachlab-breachlab-1   Up Less than a second   127.0.0.1:3000->3000/tcp
+Hallazgo de la primera corrida: exit 1 con `ports are not available ... bind: Only one
+usage of each socket address` — un `node server.js` huérfano de una sesión previa
+(PID 26584, arranque 16:54) tenía 127.0.0.1:3000 en el host. Se detuvo ese proceso y se
+repitió limpio (arriba). El health de esa primera corrida respondió el proceso del HOST,
+no el contenedor — descartado como evidencia.
+
+## 3. Health check desde el host (contra el contenedor)
+
+Comando: `curl http://127.0.0.1:3000/api/health` (tras 3 s de arranque)
+Esperado: `{"status":"ok","db_entries":12,"act":1}`
+Observado: `{"status":"ok","db_entries":12,"act":1}` ✓ (seed 12 intacta dentro del
+contenedor — data/ propia, efímera; la DB del host NO se toca).
+
+## 4. Aislamiento a nivel host (D-0003 preservado) — CRÍTICO
+
+Comando (contenedor corriendo): `netstat -ano -p tcp | findstr :3000` (filtro LISTENING)
+Esperado: listener en 127.0.0.1:3000 solamente; NINGUNO en 0.0.0.0:3000.
+Observado:
+  TCP    127.0.0.1:3000    0.0.0.0:0    LISTENING    20448
+  PID 20448 = com.docker.backend.exe (docker-proxy)
+Único listener = loopback del host. Si el compose publicara "3000:3000" aparecería
+`0.0.0.0:3000 LISTENING` — no aparece. El binding "127.0.0.1:3000:3000" del compose es
+el que sostiene el aislamiento D-0003 a nivel host (ADR D-0008).
+
+## 5. Teardown
+
+Comando: `docker compose down`
+Esperado: red/contenedor removidos, exit 0.
+Observado: `Network breachlab_default Removed` · down_exit=0 ✓
+Imágenes: queda `breachlab:0.4.0` (255MB) como cache local + dangling sha del build sin
+tag (cache de BuildKit, intencional).
+
+## 6. Suite
+
+Comando: `npm ci && npm test`
+Observado: **59/59 pass, 0 fail** (57 previas + 2 nuevas en test/docker.test.js:
+proceso real con HOST=0.0.0.0 arranca/sirve health; sin HOST bind default 127.0.0.1).
+Hallazgo fixeado en la marcha: `PORT=0` colisionaba porque
+`Number.parseInt('0') || DEFAULT_PORT` come el 0 (falsy) → puerto 3000 fijo → EADDRINUSE
+entre childs consecutivos. Fix: `Number.isInteger(portArg) ? portArg : DEFAULT_PORT`
+(server.js) — PORT=0 (efímero) soportado; sin PORT/basura → 3000 igual que antes.
+
+## 7. Re-verificación final (post docs/CI/brain, mismo estado que el commit)
+
+- `npm ci && npm test` → exit=0, **tests 59 · pass 59 · fail 0**.
+- Smoke camino default (`node server.js` sin env, DB tmp propia):
+  `[breachlab] http://127.0.0.1:3000 — sandbox local · acto 1 (normal)` → bind default
+  intacto, cero cambio observable para `npm start` (D-0003).
+- gitleaks local: no disponible en PATH de la sesión (deuda L-05, ya tracked por el
+  orquestador). Los archivos nuevos del slice no contienen secrets (0 keys de ningún
+  tipo en Dockerfile/compose/.dockerignore/test/evidence); el gate corre en CI.
+
+## Veredicto
+
+AC del slice cumplidas con evidencia: build ✓ · up ✓ · health exacto ✓ · aislamiento
+loopback a nivel host demostrado por netstat ✓ · down limpio ✓ · suite 59/59 ✓.

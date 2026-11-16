@@ -21,6 +21,18 @@ npm start
 
 Abrí **http://127.0.0.1:3000** — sin configuración, sin variables de entorno, sin build step. Requiere [Node.js ≥ 24](https://nodejs.org) (módulo nativo `node:sqlite`).
 
+## Correrlo con Docker
+
+¿No tenés Node 24 a mano? La misma experiencia, un comando:
+
+```bash
+docker compose up --build
+```
+
+Abrí **http://127.0.0.1:3000**. Paralo con `Ctrl+C` (o `docker compose down` para desarmarlo del todo).
+
+**Nota de seguridad:** el aislamiento loopback (el server jamás escucha en `0.0.0.0` cuando lo corrés con Node) se preserva **a nivel host mediante el port binding del compose** `"127.0.0.1:3000:3000"` — Docker publica el puerto *solo* en el loopback del host, así que nada es alcanzable desde otras máquinas. Dentro del contenedor el server sí debe bindear `0.0.0.0` (Docker no puede alcanzar el loopback de un contenedor desde afuera — para eso está el `ENV HOST=0.0.0.0` del Dockerfile), y el bot atacante sigue golpeando el `127.0.0.1` interno del contenedor: mismo proceso, mismo relato HTTP real. La carpeta `data/` es efímera por diseño — el lab se re-seedea en cada arranque.
+
 ## Qué vas a ver — el incidente en 5 actos
 
 | Acto | La historia |
