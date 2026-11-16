@@ -3,47 +3,16 @@
 // FIX-1: escenario 2 = ráfaga finita de exactamente 10 que se frena sola + evento de
 // cierre en timeline. FIX-2: rendición tras 20 rebotes CONSECUTIVOS (cualquier 2xx
 // reanima) — el ataque exitoso (201s) NUNCA se auto-detiene (AC1 de N-0002 intacta).
-const { mkdtempSync } = require('node:fs');
-const os = require('node:os');
-const path = require('node:path');
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { buildApp } = require('../server');
-const { createLab } = require('../src/lab');
-const { createAttacker, BOT_GIVEUP_STREAK, SCENARIO_BURST } = require('../src/attacker');
-
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const { BOT_GIVEUP_STREAK, SCENARIO_BURST } = require('../src/attacker');
+const { sleep, until, withServer } = require('./helpers');
 
 assert.equal(BOT_GIVEUP_STREAK, 20); // contrato G3: los números son finales
 assert.equal(SCENARIO_BURST, 10);
 
-async function withServer(t) {
-  const dir = mkdtempSync(path.join(os.tmpdir(), 'breachlab-g3-'));
-  const lab = createLab({ file: path.join(dir, 'test.db') });
-  const attacker = createAttacker({ lab });
-  const server = buildApp(lab, attacker).listen(0, '127.0.0.1');
-  await new Promise((r) => server.on('listening', r));
-  attacker.setPort(server.address().port);
-  t.after(() => { attacker.stop(); server.close(); lab.db.close(); });
-  const base = `http://127.0.0.1:${server.address().port}`;
-  const post = (p, body) => fetch(base + p, {
-    method: 'POST', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(body ?? {}),
-  });
-  const get = (p) => fetch(base + p).then((r) => r.json());
-  const state = () => get('/api/lab/state');
-  const events = async () => (await get('/api/lab/timeline')).events;
-  const until = async (fn, ms, what) => {
-    const end = Date.now() + ms;
-    let v;
-    while (Date.now() < end) { v = await fn(); if (v) return v; await sleep(100); }
-    assert.ok(false, `timeout esperando ${what}`);
-  };
-  return { lab, post, get, state, events, until };
-}
-
 test('FIX-1 escenario 2: ráfaga finita — exactamente 10, se frena solo, evento de cierre, 0 escrituras', async (t) => {
-  const { post, get, state, events, until } = await withServer(t);
+  const { post, getJson: get, state, timeline: events } = await withServer(t);
   await post('/api/lab/hardening', { enabled: true });
   const res = await post('/api/lab/scenario/scopeless-key');
   assert.equal(res.status, 202);
@@ -67,7 +36,7 @@ test('FIX-1 escenario 2: ráfaga finita — exactamente 10, se frena solo, event
 });
 
 test('FIX-2 rendición: 20 rebotes consecutivos frenan al bot; los 201 nunca (racha resetea con 2xx)', async (t) => {
-  const { post, state, events, until } = await withServer(t);
+  const { post, state, timeline: events } = await withServer(t);
 
   await t.test('ataque exitoso: >20 requests con 201 y el bot sigue corriendo (AC1 N-0002)', async () => {
     await post('/api/lab/attack', { action: 'start' });

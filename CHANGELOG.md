@@ -3,6 +3,18 @@
 Format based on [Keep a Changelog](https://keepachangelog.com/); versioning follows
 [SemVer](https://semver.org/).
 
+## [0.4.1] — 2026-11-15
+Test-suite dedupe + portfolio docs (no product behavior changes).
+
+### Changed
+- **Shared test helpers** (`test/helpers.js`): the `withServer` / `until` / `sleep`
+  boilerplate copied across 11 suites is now canonical in one file. Duplication in
+  `test/` drops from 21.6% to **4.2%** (jscpd, min-tokens 45); `src/` stays <1%.
+- **Architecture section in both READMEs** (EN/ES): ASCII diagram, the 5 design
+  rationales (lab.js as core, victim API vs defender console, middleware order,
+  real-HTTP simulation, stateless panel) and a composition table.
+- Housekeeping: 60/60 tests green (same assertions, zero test behavior changes).
+
 ## [0.4.0] — 2026-11-15
 Docker: run the lab with no Node.js installed — same loopback isolation (ADR D-0008).
 

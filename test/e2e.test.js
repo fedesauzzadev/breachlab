@@ -4,45 +4,16 @@
 // hardening → re-attack bounces. If any slice regresses, this test sees it.
 // Timing: real bot at 4 req/s with real thresholds (>30 req/10 s → alert at hit 31,
 // ~8 s of wall clock) — budgets derive from the importable constants, never hardcoded.
-const { readFileSync, mkdtempSync } = require('node:fs');
-const os = require('node:os');
-const path = require('node:path');
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { buildApp } = require('../server');
-const { createLab, maskKey, SEED_LEGIT_ENTRIES } = require('../src/lab');
-const { createAttacker, BOT_INTERVAL_MS } = require('../src/attacker');
+const { maskKey, SEED_LEGIT_ENTRIES } = require('../src/lab');
+const { BOT_INTERVAL_MS } = require('../src/attacker');
 const { DETECTION_MAX_REQUESTS, DETECTION_WINDOW_MS } = require('../src/apikey');
-
-const KEY = JSON.parse(readFileSync(path.join(__dirname, '..', 'repo-sim', 'config.json'), 'utf8')).api_key;
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const { KEY, until, withServer } = require('./helpers');
 
 test('the full incident in 5 acts (e2e regression)', async (t) => {
-  const dir = mkdtempSync(path.join(os.tmpdir(), 'breachlab-e2e-'));
-  const lab = createLab({ file: path.join(dir, 'test.db') });
-  const attacker = createAttacker({ lab });
-  const server = buildApp(lab, attacker).listen(0, '127.0.0.1');
-  await new Promise((r) => server.on('listening', r));
-  attacker.setPort(server.address().port);
-  t.after(() => { attacker.stop(); server.close(); lab.db.close(); });
-  const base = `http://127.0.0.1:${server.address().port}`;
-  const post = (p, body, key = KEY) => fetch(base + p, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', ...(key ? { 'x-api-key': key } : {}) },
-    body: JSON.stringify(body ?? {}),
-  });
+  const { lab, post, getJson: get, state, timeline, audit } = await withServer(t, { key: KEY });
   const labpost = (p, body) => post(p, body, null);
-  const get = (p, key) => fetch(base + p, {
-    headers: key ? { 'x-api-key': key } : {},
-  }).then((r) => r.json());
-  const state = () => get('/api/lab/state');
-  const audit = async () => (await get('/api/lab/audit')).attempts;
-  const until = async (fn, ms, what) => {
-    const end = Date.now() + ms;
-    let v;
-    while (Date.now() < end) { v = await fn(); if (v) return v; await sleep(100); }
-    assert.ok(false, `timeout esperando ${what}`);
-  };
   let frozen = 0; // garbage count at containment — act 5 proves it never grows again
 
   await t.test('act 1 — normal: seed intact, leak readable, leaked key WORKS', async () => {
@@ -73,7 +44,7 @@ test('the full incident in 5 acts (e2e regression)', async (t) => {
     assert.equal(s3.db.legit, SEED_LEGIT_ENTRIES); // legit rows untouched
     assert.equal(s3.attack.blocked, 0); // pre-containment: 100% of attacker writes SUCCEED
     assert.ok(s3.attack.recent.length > 0 && s3.attack.recent.every((r) => r.status === 201));
-    const alert = (await get('/api/lab/timeline')).events.find((e) => e.kind === 'alert');
+    const alert = (await timeline()).find((e) => e.kind === 'alert');
     assert.ok(alert, 'sin evento alert en el timeline');
     assert.equal(alert.severity, 'critical');
     assert.ok(alert.message.includes('anomalous volume') && alert.message.includes(maskKey(KEY)));
@@ -129,8 +100,8 @@ test('the full incident in 5 acts (e2e regression)', async (t) => {
     assert.equal(s5.act, 5);
     assert.equal(s5.keys.storage, 'sha256');
     assert.ok(s5.attack.recent.every((r) => [401, 403, 429].includes(r.status)));
-    const giveup = (await get('/api/lab/timeline')).events
-      .find((e) => e.message.startsWith('El atacante dejó de intentar'));
+    const giveup = (await timeline()).find((e) =>
+      e.message.startsWith('El atacante dejó de intentar'));
     assert.ok(giveup, 'evento de rendición en timeline (ADR D-0006)');
     const audited = await audit();
     assert.ok(audited.length >= 3); // a row per blocked attempt that reached auth

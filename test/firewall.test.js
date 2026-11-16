@@ -1,46 +1,21 @@
 'use strict';
 // S04 — Matafuegos (N-0003): kill switch → 403 · rotación → 401 + key nueva (solo máscara) · rate limit → 429 + Retry-After.
-const { readFileSync, mkdtempSync } = require('node:fs');
-const os = require('node:os');
-const path = require('node:path');
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { buildApp } = require('../server');
-const { createLab, maskKey } = require('../src/lab');
-const { createAttacker } = require('../src/attacker');
+const { maskKey } = require('../src/lab');
+const { KEY, until, withServer } = require('./helpers');
 
-const KEY = JSON.parse(readFileSync(path.join(__dirname, '..', 'repo-sim', 'config.json'), 'utf8')).api_key;
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-
-async function withServer(t) {
-  const dir = mkdtempSync(path.join(os.tmpdir(), 'breachlab-'));
-  const lab = createLab({ file: path.join(dir, 'test.db') });
-  const attacker = createAttacker({ lab });
-  const server = buildApp(lab, attacker).listen(0, '127.0.0.1');
-  await new Promise((r) => server.on('listening', r));
-  attacker.setPort(server.address().port);
-  t.after(() => { attacker.stop(); server.close(); lab.db.close(); });
-  const base = `http://127.0.0.1:${server.address().port}`;
-  const post = (p, body, key = KEY) => fetch(base + p, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', ...(key ? { 'x-api-key': key } : {}) },
-    body: typeof body === 'string' ? body : JSON.stringify(body ?? {}),
-  });
-  const fw = (name, body) => post(`/api/lab/firewall/${name}`, body, null);
-  const state = async () => (await fetch(`${base}/api/lab/state`)).json();
-  const timeline = async () => (await (await fetch(`${base}/api/lab/timeline`)).json()).events;
-  const until = async (fn, ms, what) => {
-    const end = Date.now() + ms;
-    let v;
-    while (Date.now() < end) { v = await fn(); if (v) return v; await sleep(100); }
-    assert.ok(false, `timeout esperando ${what}`);
-  };
+// Wrapper fino: matafuegos = POST a la consola del defensor (sin key).
+async function withFirewall(t) {
+  const ctx = await withServer(t, { key: KEY });
+  const fw = (name, body) => ctx.post(`/api/lab/firewall/${name}`, body, null);
   const activeKey = () => // la key NUEVA solo existe completa en la DB (acceso de test)
-    lab.db.prepare("SELECT key_plain FROM api_keys WHERE status = 'active' ORDER BY id DESC LIMIT 1")
+    ctx.lab.db.prepare("SELECT key_plain FROM api_keys WHERE status = 'active' ORDER BY id DESC LIMIT 1")
       .get().key_plain;
-  return { base, lab, post, fw, state, timeline, until, activeKey };
-}test('AC1 kill switch: 403 key_disabled, basura congela, blocked crece, evento con hora, acto 3→4', async (t) => {
-  const { base, post, fw, state, timeline, until } = await withServer(t);
+  return { ...ctx, fw, activeKey };
+}
+test('AC1 kill switch: 403 key_disabled, basura congela, blocked crece, evento con hora, acto 3→4', async (t) => {
+  const { base, post, fw, state, timeline } = await withFirewall(t);
   await post('/api/lab/attack', { action: 'start' });
   // Umbral acelerado con 32 ESCRITURAS de la key (L-9/D-0007: el detector solo cuenta
   // POST — los GET ya no inflan la ventana).
@@ -69,7 +44,7 @@ async function withServer(t) {
 });
 
 test('AC2 rotación: key vieja → 401, nueva legítima (solo máscara en respuestas), bot rebota 401', async (t) => {
-  const { post, fw, state, timeline, until, activeKey } = await withServer(t);
+  const { post, fw, state, timeline, activeKey } = await withFirewall(t);
   await post('/api/lab/attack', { action: 'start' });
   await until(async () => ((await state()).attack.requests >= 2 ? 1 : null), 5000, 'requests del bot');
 
@@ -99,7 +74,7 @@ test('AC2 rotación: key vieja → 401, nueva legítima (solo máscara en respue
 });
 
 test('AC3+NFR-5 rate limit default 10/10s: 25 en ráfaga → EXACTAMENTE 10×2xx y 15×429 con Retry-After', async (t) => {
-  const { post, fw, state } = await withServer(t);
+  const { post, fw, state } = await withFirewall(t);
   const on = await fw('rate-limit', { enabled: true });
   assert.equal(on.status, 200);
   assert.deepEqual(await on.json(), { ratelimit: true, max: 10, window_ms: 10000 });
@@ -115,7 +90,7 @@ test('AC3+NFR-5 rate limit default 10/10s: 25 en ráfaga → EXACTAMENTE 10×2xx
 });
 
 test('AC3 params custom + bot estrangulado: 429 domina el feed, throughput acotado al límite', async (t) => {
-  const { post, fw, state, timeline, until } = await withServer(t);
+  const { post, fw, state, timeline } = await withFirewall(t);
   const on = await fw('rate-limit', { enabled: true, max: 3, window_ms: 60000 });
   assert.deepEqual(await on.json(), { ratelimit: true, max: 3, window_ms: 60000 });
   const codes = [];
@@ -133,7 +108,7 @@ test('AC3 params custom + bot estrangulado: 429 domina el feed, throughput acota
 });
 
 test('Combinados en cualquier orden: kill switch sobre la key filtrada tras rotar → 403; flags íntegros', async (t) => {
-  const { post, fw, state, activeKey } = await withServer(t);
+  const { post, fw, state, activeKey } = await withFirewall(t);
   await fw('rotate-key', {});
   await fw('kill-switch', { enabled: true }); // actúa sobre la COMPROMETIDA (ahora disabled)
   const r = await post('/api/entries', { title: 't', body: 'b' });
@@ -148,7 +123,7 @@ test('Combinados en cualquier orden: kill switch sobre la key filtrada tras rota
 });
 
 test('Validación 400 en los tres endpoints (frontera §2.4) y bordes de rango aceptados', async (t) => {
-  const { fw } = await withServer(t);
+  const { fw } = await withFirewall(t);
   const badBodies = [
     ['kill-switch', { enabled: 'true' }], ['kill-switch', {}], ['kill-switch', { enabled: 1 }],
     ['rotate-key', { extra: 1 }], ['rotate-key', 'x'], ['rotate-key', []],

@@ -1,0 +1,30 @@
+# Evidencia — dedupe de tests + docs de arquitectura (v0.4.1)
+
+Fecha: 2026-11-15 · HEAD previo e7186a8 (v0.4.0). Round ejecutado por el orquestador
+(dev subagent agotó límite semanal; trabajo continuado a mano).
+
+## Tarea 1 — dedupe de tests
+
+- Antes: `npx jscpd test --min-tokens 45` → 38 clones, **21.63%** líneas duplicadas
+  (medido en la sesión de análisis, mismo comando).
+- Cambio: `test/helpers.js` canónico (`KEY` del artefacto repo-sim/config.json,
+  `sleep`, `until`, `withServer` con `defaultKey` opcional) + migración de s08, s09a,
+  s09b (los otros 6 archivos ya los había migrado el dev antes de agotar límite;
+  3 bugs de migración corregidos a mano: `leak` no definido en lab.test.js, `post`
+  sin key por defecto en attack.test.js, `until`/`sleep`/`BOT_INTERVAL_MS` no
+  importados).
+- Quedan con setup propio POR DISEÑO (no forzados): `debt-closure.test.js` (helper
+  `newApp`/`http` con firma distinta — post con headers explícitos) y
+  `docker.test.js` (spawnea proceso real, nada que compartir).
+- Después: **7 clones, 4.20% duplicado** (55/1309 líneas). Target <5% ✓.
+- `npx jscpd src --min-tokens 45` → 1 clone preexistente (6 líneas, labroutes), <1%.
+
+## Tarea 2 — arquitectura en READMEs
+
+- README.md (EN) y README.es.md (ES): diagrama ASCII + 5 racionales de diseño +
+  tabla de composición, insertados tras la sección demo/screenshots.
+
+## Verificación
+
+- `npm ci && npm test` → **60/60 pass, 0 fail** (mismas aserciones, cero cambios de
+  comportamiento de test). Duración ~44 s con --test-concurrency=2.

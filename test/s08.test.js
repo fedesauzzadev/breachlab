@@ -4,51 +4,16 @@
 // restaurado, timeline/audit limpios, flags en cero, demo re-jugable). N-0006:
 // escenario 2 — key auténtica y activa SIN scope: POST → 403 insufficient_scope
 // auditado, GET → 200, DB limpia.
-const { readFileSync, mkdtempSync } = require('node:fs');
 const net = require('node:net');
-const os = require('node:os');
-const path = require('node:path');
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { buildApp } = require('../server');
-const { createLab, maskKey, SEED_LEGIT_ENTRIES } = require('../src/lab');
-const { createAttacker, BOT_INTERVAL_MS } = require('../src/attacker');
+const { maskKey, SEED_LEGIT_ENTRIES } = require('../src/lab');
+const { BOT_INTERVAL_MS } = require('../src/attacker');
 const { DETECTION_MAX_REQUESTS, DETECTION_WINDOW_MS } = require('../src/apikey');
-
-const KEY = JSON.parse(readFileSync(path.join(__dirname, '..', 'repo-sim', 'config.json'), 'utf8')).api_key;
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-
-async function withServer(t) {
-  const dir = mkdtempSync(path.join(os.tmpdir(), 'breachlab-s08-'));
-  const lab = createLab({ file: path.join(dir, 'test.db') });
-  const attacker = createAttacker({ lab });
-  const server = buildApp(lab, attacker).listen(0, '127.0.0.1');
-  await new Promise((r) => server.on('listening', r));
-  attacker.setPort(server.address().port);
-  t.after(() => { attacker.stop(); server.close(); lab.db.close(); });
-  const base = `http://127.0.0.1:${server.address().port}`;
-  const post = (p, body, key = null) => fetch(base + p, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', ...(key ? { 'x-api-key': key } : {}) },
-    body: typeof body === 'string' ? body : JSON.stringify(body ?? {}),
-  });
-  const get = (p, key) => fetch(base + p, { headers: key ? { 'x-api-key': key } : {} })
-    .then((r) => r.json());
-  const state = () => get('/api/lab/state');
-  const audit = async () => (await get('/api/lab/audit')).attempts;
-  const until = async (fn, ms, what) => {
-    const end = Date.now() + ms;
-    let v;
-    while (Date.now() < end) { v = await fn(); if (v) return v; await sleep(100); }
-    assert.ok(false, `timeout esperando ${what}`);
-  };
-  const keysInDb = () => lab.db.prepare(
-    'SELECT label, key_plain, key_hash, scope, status FROM api_keys ORDER BY id').all();
-  return { base, lab, server, post, get, state, audit, until, keysInDb };
-}
+const { KEY, sleep, until, withServer } = require('./helpers');
 
 test('N-0005 hitos del modo guiado avanzan con el incidente y el reset restaura el acto 1 sin reiniciar el proceso', async (t) => {
-  const { lab, server, post, get, state, audit, until } = await withServer(t);
+  const { base, lab, post, getJson: get, state, audit, server } = await withServer(t);
   const NONE = { attack_started: false, alert_fired: false, firewalls_applied: false, hardening_on: false, reattack_bounced: false };
   assert.deepEqual((await state()).milestones, NONE); // arranque: nada completado
 
@@ -111,7 +76,7 @@ test('N-0005 hitos del modo guiado avanzan con el incidente y el reset restaura 
 });
 
 test('N-0006 escenario 2: key válida sin scope — POST 403 insufficient_scope auditado, GET 200, DB limpia', async (t) => {
-  const { base, lab, post, get, state, audit, until, keysInDb } = await withServer(t);
+  const { base, lab, post, getJson: get, state, audit, keysInDb } = await withServer(t);
 
   assert.equal((await post('/api/lab/scenario/scopeless-key', {})).status, 400); // sin hardening
   await post('/api/lab/hardening', { enabled: true });
@@ -156,7 +121,7 @@ test('N-0006 escenario 2: key válida sin scope — POST 403 insufficient_scope 
 // el body). El fix: epoch del lab estampada en la auth; el handler rechaza 409 si el
 // reset cambió el mundo debajo del request.
 test('M-3 TOCTOU del reset: POST autenticado pre-reset con body goteado rebota y no ensucia el seed', async (t) => {
-  const { lab, server, post, get } = await withServer(t);
+  const { lab, server, post, getJson: get } = await withServer(t);
   const port = server.address().port;
   const body = JSON.stringify({ title: 'QA-RACE-TRICKLE', body: 'escritura de la demo anterior' });
   const headers =

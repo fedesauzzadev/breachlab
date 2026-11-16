@@ -74,6 +74,51 @@ instant incident reset, and a second scenario telling the least-privilege story.
 
 **Read the full story after the run: [Incident postmortem](docs/postmortem.md)** — timeline, impact, root cause, rapid response and long-term fixes, written as a professional incident report.
 
+## Architecture
+
+One Node process, ~950 lines of product code, **one runtime dependency (Express)**, no build step.
+
+```
+┌─ BROWSER ────────────────────────────────────────────────────────┐
+│ public/index.html + panel.js — vanilla UI, 1s polling, no build  │
+└──────────────┬───────────────────────────────────────────────────┘
+               │ fetch loopback
+┌──────────────▼───────────── EXPRESS (server.js) ─────────────────┐
+│  VICTIM API (entries.js)        DEFENDER CONSOLE (labroutes.js)  │
+│  GET/POST /api/entries          /api/lab/state · timeline        │
+│        │                        /attack · firewall/*             │
+│        ▼                        /hardening · audit · export      │
+│  [ratelimit.js] → [apikey.js]   /scenarios · reset               │
+│   10 req/10s per key   key? scope? anomaly detector (POST only)  │
+│        │                                │                        │
+│        ▼                                ▼                        │
+│  ┌─ node:sqlite (native) ── lab.js = THE CORE (state machine) ─┐ │
+│  │ entries · events · audit · api_keys                         │ │
+│  └─────────────────────────────────────────────────────────────┘ │
+│  ATTACKER BOT (attacker.js) — lives INSIDE the process:          │
+│  real HTTP against 127.0.0.1 → the 401/403/429 in the feed are   │
+│  genuine middleware responses, not UI effects. Gives up after    │
+│  20 consecutive bounces.                                         │
+│  SCENARIOS (scenarios.js) — 3 leak vectors + fake artifacts      │
+│  (repo-sim/config.json, public/leak/*)                           │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+**Why it's shaped this way:**
+
+1. **`lab.js` is the heart** (~200 lines): it owns the DB, the seed, the 5-act state machine, the response flags (killswitch / rotation / hardening), the `epoch` counter (reset race protection) and the business operations. Everything goes through it — the other modules are surfaces.
+2. **Two APIs with different skins**: `entries.js` is the API that suffers the attack (strict boundary validation: title 1–80, body 1–280); `labroutes.js` is your defender console (keyless — it only exists on loopback).
+3. **Chained middlewares** `rateLimit → apikey → handler`: that order is a documented decision — throttle *before* authenticating under flood. `apikey.js` has two modes: vulnerable (plaintext comparison — the bad practice this demo denounces) and hardened (sha256 + scope).
+4. **The simulation attacks for real**: the bot fires actual HTTP against the server's own loopback. That's why the feed shows real HTTP codes — the difference between a demo and a mock.
+5. **Stateless panel**: the UI stores nothing — it polls `/api/lab/state` every second and paints what the server says. Single source of truth: the DB + `lab.js`.
+
+| Composition | |
+|---|---|
+| Product code | 9 files · ~950 lines (incl. panel) |
+| Tests | 11 suites · 60 tests · ~98% coverage |
+| Duplication | <1% in `src/`, 4.2% in tests (jscpd) |
+| Dependencies | 1 runtime (Express) · SQLite native via `node:sqlite` |
+
 ## Security notes (read this)
 
 - **Every key in this repo is fake.** Demo keys use the `sk_breachlab_demo_` prefix and are *FAKE BY DESIGN* — no real third-party secret is ever included. The repo ships a secrets gate (`npm run scan:secrets`) that must report **0 findings**.

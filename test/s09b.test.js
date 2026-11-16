@@ -3,39 +3,14 @@
 // (attachment) con el timeline COMPLETO, el audit log y el resumen del postmortem,
 // generado server-side con el estado vivo: un tercero reconstruye la cronología del
 // incidente sin correr la demo. Funciona también en acto 1 (sin incidente: audit vacío).
-const { mkdtempSync } = require('node:fs');
-const os = require('node:os');
-const path = require('node:path');
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { buildApp } = require('../server');
-const { createLab } = require('../src/lab');
-const { createAttacker, BOT_INTERVAL_MS } = require('../src/attacker');
+const { BOT_INTERVAL_MS } = require('../src/attacker');
 const { DETECTION_MAX_REQUESTS, DETECTION_WINDOW_MS } = require('../src/apikey');
-
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const { sleep, until, withServer } = require('./helpers');
 
 test('N-0008: export de evidencia — markdown attachment con timeline + audit + resumen del postmortem', async (t) => {
-  const dir = mkdtempSync(path.join(os.tmpdir(), 'breachlab-s09b-'));
-  const lab = createLab({ file: path.join(dir, 'test.db') });
-  const attacker = createAttacker({ lab });
-  const server = buildApp(lab, attacker).listen(0, '127.0.0.1');
-  await new Promise((r) => server.on('listening', r));
-  attacker.setPort(server.address().port);
-  t.after(() => { attacker.stop(); server.close(); lab.db.close(); });
-  const base = `http://127.0.0.1:${server.address().port}`;
-  const post = (p, body) => fetch(base + p, {
-    method: 'POST', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(body ?? {}),
-  });
-  const get = (p) => fetch(base + p).then((r) => r.json());
-  const state = () => get('/api/lab/state');
-  const until = async (fn, ms, what) => {
-    const end = Date.now() + ms;
-    let v;
-    while (Date.now() < end) { v = await fn(); if (v) return v; await sleep(100); }
-    assert.ok(false, `timeout esperando ${what}`);
-  };
+  const { base, post, getJson: get, state } = await withServer(t);
 
   // AC1, acto 1: export válido incluso sin incidente — audit vacío narrado, no roto.
   let res = await fetch(base + '/api/lab/export');

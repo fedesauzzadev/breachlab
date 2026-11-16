@@ -3,49 +3,20 @@
 // revocada 401 (AC2) · audit log con hora, key enmascarada, endpoint y motivo (AC3) ·
 // re-ataque 100% rebotado con 0 basura nueva y panel endurecido (AC5).
 // AC4 (postmortem EN) queda para S06.
-const { readFileSync, mkdtempSync } = require('node:fs');
-const os = require('node:os');
-const path = require('node:path');
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { buildApp } = require('../server');
-const { createLab, maskKey, sha256Hex } = require('../src/lab');
-const { createAttacker } = require('../src/attacker');
+const { maskKey, sha256Hex } = require('../src/lab');
+const { KEY, until, withServer } = require('./helpers');
 
-const KEY = JSON.parse(readFileSync(path.join(__dirname, '..', 'repo-sim', 'config.json'), 'utf8')).api_key;
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-
-async function withServer(t) {
-  const dir = mkdtempSync(path.join(os.tmpdir(), 'breachlab-'));
-  const lab = createLab({ file: path.join(dir, 'test.db') });
-  const attacker = createAttacker({ lab });
-  const server = buildApp(lab, attacker).listen(0, '127.0.0.1');
-  await new Promise((r) => server.on('listening', r));
-  attacker.setPort(server.address().port);
-  t.after(() => { attacker.stop(); server.close(); lab.db.close(); });
-  const base = `http://127.0.0.1:${server.address().port}`;
-  const post = (p, body, key = KEY) => fetch(base + p, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', ...(key ? { 'x-api-key': key } : {}) },
-    body: typeof body === 'string' ? body : JSON.stringify(body ?? {}),
-  });
-  const labpost = (p, body) => post(p, body, null);
-  const state = async () => (await fetch(`${base}/api/lab/state`)).json();
-  const audit = async (since = 0) =>
-    (await (await fetch(`${base}/api/lab/audit?since=${since}`)).json()).attempts;
-  const until = async (fn, ms, what) => {
-    const end = Date.now() + ms;
-    let v;
-    while (Date.now() < end) { v = await fn(); if (v) return v; await sleep(100); }
-    assert.ok(false, `timeout esperando ${what}`);
-  };
-  const keysInDb = () => lab.db.prepare(
-    'SELECT label, key_plain, key_hash, scope, status FROM api_keys ORDER BY id').all();
-  return { base, lab, post, labpost, state, audit, until, keysInDb };
+// Wrapper fino: labpost = POST a la consola del defensor (sin key).
+async function withHardening(t) {
+  const ctx = await withServer(t, { key: KEY });
+  const labpost = (p, body) => ctx.post(p, body, null);
+  return { ...ctx, labpost };
 }
 
 test('AC1 hardening: DB pasa a sha256 (plain NULL en todas las filas), scope solo para la vigente, la legítima sigue escribiendo', async (t) => {
-  const { labpost, post, state, keysInDb } = await withServer(t);
+  const { labpost, post, state, keysInDb } = await withHardening(t);
   await labpost('/api/lab/firewall/rotate-key', {}); // la vigente pasa a ser la rotada
   const before = keysInDb(); // el plain solo existe acá: se captura antes de migrar
   const rotated = before.find((r) => r.label === 'rotated').key_plain;
@@ -72,7 +43,7 @@ test('AC1 hardening: DB pasa a sha256 (plain NULL en todas las filas), scope sol
 });
 
 test('AC2 sin rotación: la key filtrada (aún active) hace POST → 403 insufficient_scope; GET sigue OK; audit con la fila', async (t) => {
-  const { base, labpost, post, audit } = await withServer(t);
+  const { base, labpost, post, audit } = await withHardening(t);
   await labpost('/api/lab/hardening', { enabled: true });
   const res = await post('/api/entries', { title: 'spam', body: 'spam' }); // key del leak
   assert.equal(res.status, 403);
@@ -89,7 +60,7 @@ test('AC2 sin rotación: la key filtrada (aún active) hace POST → 403 insuffi
 });
 
 test('AC2+AC5 re-ataque tras rotate+hardening: bot con la key filtrada → 100% rebota 401, 0 basura nueva, audit fila por intento', async (t) => {
-  const { labpost, post, state, audit, until } = await withServer(t);
+  const { labpost, post, state, audit } = await withHardening(t);
   await labpost('/api/lab/firewall/rotate-key', {});
   await labpost('/api/lab/hardening', { enabled: true });
   const before = await state();
@@ -112,7 +83,7 @@ test('AC2+AC5 re-ataque tras rotate+hardening: bot con la key filtrada → 100% 
 });
 
 test('AC3 tabla audit SOLO con hardening activo: rebotes previos (401/403) no dejan rastro; con hardening sí', async (t) => {
-  const { lab, labpost, post, audit } = await withServer(t);
+  const { lab, labpost, post, audit } = await withHardening(t);
   await labpost('/api/lab/firewall/rotate-key', {});
   assert.equal((await post('/api/entries', { title: 'x', body: 'y' })).status, 401); // vulnerable
   await labpost('/api/lab/firewall/kill-switch', { enabled: true });
@@ -127,7 +98,7 @@ test('AC3 tabla audit SOLO con hardening activo: rebotes previos (401/403) no de
 });
 
 test('AC3 GET /api/lab/audit: ids ascendentes, fila sin key presentada con máscara —, ?since= incremental', async (t) => {
-  const { base, labpost, audit } = await withServer(t);
+  const { base, labpost, audit } = await withHardening(t);
   await labpost('/api/lab/hardening', { enabled: true });
   await fetch(`${base}/api/entries`, { method: 'POST', body: '{}' }); // sin header x-api-key
   await fetch(`${base}/api/entries`, { method: 'POST',
@@ -143,7 +114,7 @@ test('AC3 GET /api/lab/audit: ids ascendentes, fila sin key presentada con másc
 });
 
 test('rotar con hardening activo: la nueva key nace hasheada con scope y la DB sigue sin texto plano', async (t) => {
-  const { labpost, post, state, keysInDb } = await withServer(t);
+  const { labpost, post, state, keysInDb } = await withHardening(t);
   await labpost('/api/lab/hardening', { enabled: true });
   assert.equal((await labpost('/api/lab/firewall/rotate-key', {})).status, 200);
   const rows = keysInDb();
@@ -160,7 +131,7 @@ test('rotar con hardening activo: la nueva key nace hasheada con scope y la DB s
 });
 
 test('validación 400 en POST /api/lab/hardening (frontera §2.4)', async (t) => {
-  const { labpost } = await withServer(t);
+  const { labpost } = await withHardening(t);
   for (const body of [{}, { enabled: false }, { enabled: 'true' }, { enabled: 1 }, 'x', []]) {
     const res = await labpost('/api/lab/hardening', body);
     assert.equal(res.status, 400, JSON.stringify(body));

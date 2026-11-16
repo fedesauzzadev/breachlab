@@ -1,25 +1,13 @@
 'use strict';
 // S01 — Sandbox vivo: seed fijo + endpoints + aislamiento (AC2, AC3, AC4, AC5-bind).
 // La key usada en los tests sale del ARTEFACTO del leak, no de una constante duplicada.
-const { readFileSync, mkdtempSync, writeFileSync } = require('node:fs');
+const { mkdtempSync, writeFileSync } = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { buildApp } = require('../server');
 const { createLab, SEED_LEGIT_ENTRIES } = require('../src/lab');
-
-const leak = JSON.parse(
-  readFileSync(path.join(__dirname, '..', 'repo-sim', 'config.json'), 'utf8'));
-
-async function withServer(t) {
-  const dir = mkdtempSync(path.join(os.tmpdir(), 'breachlab-'));
-  const lab = createLab({ file: path.join(dir, 'test.db') });
-  const server = buildApp(lab).listen(0, '127.0.0.1');
-  await new Promise((r) => server.on('listening', r));
-  t.after(() => { server.close(); lab.db.close(); });
-  return { base: `http://127.0.0.1:${server.address().port}`, server, lab };
-}
+const { KEY, withServer } = require('./helpers');
 
 test('AC5: servidor efímero bindeado EXCLUSIVAMENTE a 127.0.0.1', async (t) => {
   const { server } = await withServer(t);
@@ -38,7 +26,7 @@ test('AC2: /api/health sin key → ok, seed de 12, acto 1', async (t) => {
 
 test('AC2: /api/entries con la key DEL LEAK → 12 legit, 0 garbage', async (t) => {
   const { base } = await withServer(t);
-  const res = await fetch(`${base}/api/entries`, { headers: { 'x-api-key': leak.api_key } });
+  const res = await fetch(`${base}/api/entries`, { headers: { 'x-api-key': KEY } });
   assert.equal(res.status, 200);
   const { entries, count } = await res.json();
   assert.equal(count, SEED_LEGIT_ENTRIES);
@@ -91,7 +79,7 @@ test('AC4: /leak/config.json sirve el artefacto read-only con la key falsa', asy
   assert.equal(res.status, 200);
   const body = await res.json();
   assert.ok(body.api_key.startsWith('sk_breachlab_demo_')); // prefijo propio (D-0004)
-  assert.equal(body.api_key, leak.api_key); // la key servida ES la que autentica (el leak funciona)
+  assert.equal(body.api_key, KEY); // la key servida ES la que autentica (el leak funciona)
 });
 
 test('Invariante: seed determinista entre corridas (semilla fija)', async () => {
